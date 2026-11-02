@@ -188,6 +188,34 @@ public class BaseModelResolverTests
     }
 
     [Fact]
+    public void Resolve_Attendance_IsKeptWithoutPullingOtherModules()
+    {
+        var resolved = BaseModelResolver.Resolve([ModuleKeys.Attendance]);
+
+        resolved.Should().BeEquivalentTo([ModuleKeys.CoreHR, ModuleKeys.Leave, ModuleKeys.Reporting, ModuleKeys.Attendance]);
+    }
+
+    [Fact]
+    public void ResolveExplicit_Attendance_IsKept()
+    {
+        BaseModelResolver.ResolveExplicit([ModuleKeys.Attendance]).Should().Contain(ModuleKeys.Attendance);
+        BaseModelResolver.ResolveExplicitFromCsv("attendance").Should().Contain("attendance");
+    }
+
+    [Fact]
+    public void NormalizeForPersistence_Attendance_IsPersisted()
+    {
+        BaseModelResolver.NormalizeForPersistence([ModuleKeys.Attendance]).Should().Contain(ModuleKeys.Attendance);
+    }
+
+    [Fact]
+    public void ModuleGuard_IsExplicitlySelected_Attendance()
+    {
+        ModuleGuard.IsExplicitlySelected([ModuleKeys.CoreHR, ModuleKeys.Attendance], ModuleKeys.Attendance).Should().BeTrue();
+        ModuleGuard.IsExplicitlySelected([ModuleKeys.CoreHR, ModuleKeys.Leave], ModuleKeys.Attendance).Should().BeFalse();
+    }
+
+    [Fact]
     public void Resolve_NeverYieldsAModuleKeyOutsideTheAllowList()
     {
         foreach (var definition in ModuleSyncRegistry.GetAllModules())
@@ -222,6 +250,7 @@ public class BaseModelResolverTests
         ModuleKeys.CashManagement,
         ModuleKeys.Inventory,
         ModuleKeys.Project,
+        ModuleKeys.Attendance,
         ModuleKeys.POS,
         ModuleKeys.Reporting,
     ];

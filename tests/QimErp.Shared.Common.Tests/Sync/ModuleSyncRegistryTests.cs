@@ -264,6 +264,22 @@ public class ModuleSyncRegistryTests
     }
 
     [Fact]
+    public void Attendance_InstallRunsSetupStubOnCoreHrQueue_WithoutPrerequisites()
+    {
+        ModuleSyncRegistry.ResolveSetupSteps("attendance").Should().Equal("SetupAttendanceTenant");
+        ModuleSyncRegistry.ResolveSetupStepQueue("SetupAttendanceTenant").Should().Be("qimerp-corehr-employee-tenant-setup");
+        ModuleSyncRegistry.ResolvePrerequisites("attendance").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void BiometricSyncPlugin_RequiresAttendanceModule()
+    {
+        ModuleSyncRegistry.GetAllModules()
+            .Single(d => d.ItemKey == PluginKeys.BiometricSync)
+            .RequiresItemKey.Should().Be(ModuleSyncRegistry.TryResolveItemKey(ModuleKeys.Attendance));
+    }
+
+    [Fact]
     public void Reporting_IsCatalogued_But_Is_Not_A_Runtime_Subscriber()
     {
         ModuleSyncRegistry.TryResolveItemKey(ModuleKeys.Reporting).Should().Be("reporting");

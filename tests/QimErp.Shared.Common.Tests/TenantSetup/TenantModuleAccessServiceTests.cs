@@ -66,6 +66,35 @@ public class TenantModuleAccessServiceTests
     }
 
     [Fact]
+    public async Task IsModuleEnabledAsync_Attendance_ReturnsTrue_WhenSnapshotContainsModule()
+    {
+        var cache = new InMemoryDistributedCacheService();
+        await cache.SetAsync(
+            SharedCacheKeys.TenantModuleSnapshot(Guid.Parse(TenantId)),
+            new TenantModuleSnapshotEntry(1, [ModuleKeys.CoreHR, ModuleKeys.Leave, ModuleKeys.Attendance]),
+            expiration: null);
+
+        var service = CreateService(cache);
+
+        (await service.IsModuleEnabledAsync(TenantId, ModuleKeys.Attendance)).Should().BeTrue();
+        (await service.GetInstalledModuleKeysAsync(TenantId))!.Should().Contain(ModuleKeys.Attendance);
+    }
+
+    [Fact]
+    public async Task IsModuleEnabledAsync_Attendance_ReturnsFalse_WhenSnapshotExcludesModule()
+    {
+        var cache = new InMemoryDistributedCacheService();
+        await cache.SetAsync(
+            SharedCacheKeys.TenantModuleSnapshot(Guid.Parse(TenantId)),
+            new TenantModuleSnapshotEntry(1, [ModuleKeys.CoreHR, ModuleKeys.Leave]),
+            expiration: null);
+
+        var service = CreateService(cache);
+
+        (await service.IsModuleEnabledAsync(TenantId, ModuleKeys.Attendance)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetInstalledModuleKeysAsync_SameRequest_ReadsDistributedCacheOnce()
     {
         var cache = new CountingDistributedCacheService();
