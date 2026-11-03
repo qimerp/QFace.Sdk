@@ -155,7 +155,7 @@ public class ModuleSyncRegistryTests
             && s.ActivitySuffix == "Payroll");
         subscribers.Should().Contain(s =>
             s.ActivitySuffix == "IAM"
-            && s.TaskQueue == "qimerp-iam-employee-sync"
+            && s.TaskQueue == "qimerp-platform-employee-sync"
             && !s.RequiresModuleSelection);
     }
 
@@ -187,7 +187,7 @@ public class ModuleSyncRegistryTests
     public void ResolveSetupStepQueue_SyncSubscriptionModules_RoutesToTenantBillingSetup()
     {
         ModuleSyncRegistry.ResolveSetupStepQueue("SyncSubscriptionModules")
-            .Should().Be("qimerp-iam-tenant-setup");
+            .Should().Be("qimerp-platform-tenant-setup");
     }
 
     [Fact]
