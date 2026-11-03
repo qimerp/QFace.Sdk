@@ -27,7 +27,7 @@ public class TenantActivityPublisherActor : BaseActor
 
                 await workflowStarter.StartOrIgnoreAsync<IRecordTenantActivityWorkflow>(
                     message.WorkflowId,
-                    $"qimerp-iam-tenant-activity{suffix}",
+                    $"qimerp-platform-tenant-activity{suffix}",
                     wf => wf.RunAsync(message.Request));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

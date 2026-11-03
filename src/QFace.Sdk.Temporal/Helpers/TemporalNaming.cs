@@ -62,12 +62,12 @@ public static class TemporalNaming
     /// <para>Workflows cannot read <c>IConfiguration</c> deterministically, so
     /// this is the workflow-side equivalent of <c>TemporalOptions.WithTaskQueueSuffix</c>.</para>
     ///
-    /// <para>Example, inside a workflow whose own queue is e.g. <c>"qimerp-iam-tenant-onboarding-local"</c>:</para>
+    /// <para>Example, inside a workflow whose own queue is e.g. <c>"qimerp-platform-tenant-onboarding-local"</c>:</para>
     /// <code>
     /// var childQueue = TemporalNaming.SuffixedFromCurrentQueue(
     ///     baseQueue: "qimerp-corehr-employee-tenant-setup",
     ///     currentQueue: Workflow.Info.TaskQueue,
-    ///     currentQueueBase: "qimerp-iam-tenant-onboarding");
+    ///     currentQueueBase: "qimerp-platform-tenant-onboarding");
     /// // → "qimerp-corehr-employee-tenant-setup-local"
     /// </code>
     /// </summary>

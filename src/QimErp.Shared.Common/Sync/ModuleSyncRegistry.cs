@@ -14,7 +14,7 @@ namespace QimErp.Shared.Common.Sync;
 /// </summary>
 public static class ModuleSyncRegistry
 {
-    public const string LoadTenantModulesQueue = "qimerp-iam-tenant-activity";
+    public const string LoadTenantModulesQueue = "qimerp-platform-tenant-activity";
     public const string LoadTenantModulesActivityName = "LoadTenantModules";
 
     private static readonly ModuleSyncDefinition[] Modules =
@@ -156,13 +156,13 @@ public static class ModuleSyncRegistry
 
     private static readonly SetupStepRoute[] SetupRoutes =
     [
-        new("EnsureSubscription", "qimerp-iam-tenant-setup"),
-        new("SyncSubscriptionModules", "qimerp-iam-tenant-setup"),
+        new("EnsureSubscription", "qimerp-platform-tenant-setup"),
+        new("SyncSubscriptionModules", "qimerp-platform-tenant-setup"),
         new("CreateFirstEmployee", "qimerp-corehr-employee-tenant-setup"),
-        new("AssignSuperAdminRole", "qimerp-iam-tenant-onboarding"),
-        new("SetupIAMTenant", "qimerp-iam-tenant-onboarding"),
-        new("SeedTenantReferenceData", "qimerp-iam-tenant-onboarding"),
-        new("RepublishTenantReferenceSync", "qimerp-iam-tenant-onboarding"),
+        new("AssignSuperAdminRole", "qimerp-platform-tenant-onboarding"),
+        new("SetupIAMTenant", "qimerp-platform-tenant-onboarding"),
+        new("SeedTenantReferenceData", "qimerp-platform-tenant-onboarding"),
+        new("RepublishTenantReferenceSync", "qimerp-platform-tenant-onboarding"),
         new("SetupCoreHrTenant", "qimerp-corehr-employee-tenant-setup"),
         new("SetupPayrollTenant", "qimerp-payroll-tenant-setup"),
         new("SetupBenefitTenant", "qimerp-benefit-tenant-setup"),
@@ -250,10 +250,10 @@ public static class ModuleSyncRegistry
         new(SyncType.Employee, ModuleKeys.Recruitment, "qimerp-recruitment-employee-sync", "Recruitment"),
         new(SyncType.Employee, ModuleKeys.EmployeeEngagement, "qimerp-employeeengagement-employee-sync", "EmployeeEngagement"),
         new(SyncType.Employee, ModuleKeys.Surveys, "qimerp-surveys-employee-sync", "Surveys"),
-        new(SyncType.Employee, null, "qimerp-iam-employee-sync", "IAM", RequiresModuleSelection: false),
+        new(SyncType.Employee, null, "qimerp-platform-employee-sync", "IAM", RequiresModuleSelection: false),
         new(SyncType.Employee, ModuleKeys.Project, "qimerp-operations-project-employee-sync", "Project"),
         new(SyncType.Employee, ModuleKeys.CashManagement, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
-        new(SyncType.Employee, null, "qimerp-iam-tenantbilling-employee-sync", "TenantBilling", RequiresModuleSelection: false),
+        new(SyncType.Employee, null, "qimerp-platform-tenantbilling-employee-sync", "TenantBilling", RequiresModuleSelection: false),
 
         new(SyncType.AdminData, ModuleKeys.CoreHR, "qimerp-corehr-employee-admin-sync", "Employee"),
         new(SyncType.AdminData, ModuleKeys.Payroll, "qimerp-payroll-admin-sync", "Payroll"),
@@ -288,7 +288,7 @@ public static class ModuleSyncRegistry
         new(SyncType.PersonErasure, ModuleKeys.Workflow, "qimerp-platform-workflow-actor-sync", "Workflow"),
         new(SyncType.PersonErasure, ModuleKeys.Leave, "qimerp-leave-employee-sync", "Leave"),
         new(SyncType.PersonErasure, ModuleKeys.Payroll, "qimerp-payroll-employee-sync", "Payroll"),
-        new(SyncType.PersonErasure, null, "qimerp-iam-employee-sync", "IAM", RequiresModuleSelection: false),
+        new(SyncType.PersonErasure, null, "qimerp-platform-employee-sync", "IAM", RequiresModuleSelection: false),
     ];
 
     private static readonly Dictionary<string, ModuleSyncDefinition> ByItemKey =

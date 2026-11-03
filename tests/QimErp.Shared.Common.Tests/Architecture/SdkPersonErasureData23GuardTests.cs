@@ -21,7 +21,7 @@ public class SdkPersonErasureData23GuardTests
         content.Should().Contain(
             "SyncType.PersonErasure, ModuleKeys.Payroll, \"qimerp-payroll-employee-sync\", \"Payroll\"");
         content.Should().Contain(
-            "SyncType.PersonErasure, null, \"qimerp-iam-employee-sync\", \"IAM\", RequiresModuleSelection: false");
+            "SyncType.PersonErasure, null, \"qimerp-platform-employee-sync\", \"IAM\", RequiresModuleSelection: false");
     }
 
     private static string? FindSourceFile(string fileName, string projectFolder)
