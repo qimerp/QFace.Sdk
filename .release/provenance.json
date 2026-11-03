@@ -1,0 +1,22 @@
+{
+  "package": "QimErp.Shared.Common",
+  "version": "3.11.41",
+  "sha256": "32b1a1e413e065a2331c4df2921cc602a797578b15fd00d730efd9f9352be89e",
+  "source_base": "9101b22102376d8b766c17af7faf79748ce857ca",
+  "source_hashes": {
+    "src/QimErp.Shared.Common/Extensions/EmployeeSyncProjectionServiceCollectionExtensions.cs": "b4c604d462421d623fc131f79bbd13e048549e6cf5aaddcb6c825dc7233f1f0c",
+    "src/QimErp.Shared.Common/Options/InternalApiOptions.cs": "d378e0a73ce546209bc69c5585d02d63e6f7f7f2807d0a046188fdff59416a2f",
+    "src/QimErp.Shared.Common/QimErp.Shared.Common.csproj": "fe79a51c1ccba9a8307d8a079d61fc2357b44d620b9a9af1b4d6572b039d4147",
+    "src/QimErp.Shared.Common/Services/Employees/EmployeeSyncProjectionClient.cs": "28704498a3f06627fd88d3db1633f3685ff28360ce4c597652eec56c0760a94a",
+    "src/QimErp.Shared.Common/Filters/InternalApiSignedTenantFilter.cs": "8602789e7a9f7a2d4bb343b8e1dd93a138fa55e1d11e89db7686fdc6d103dd5e",
+    "src/QimErp.Shared.Common/Filters/InternalServiceSignature.cs": "ac8903490bc52a896f47937c365100f509773453044b6c95d53d67eaad28c0a2",
+    "tests/QimErp.Shared.Common.Tests/Filters/EmployeeProjectionSignedTenantTests.cs": "a2d83769f889009982739554ea455bd18b6bcc803519d2ebde585471ae0cf297",
+    "tests/QimErp.Shared.Common.Tests/Filters/InternalApiSignedTenantFilterTests.cs": "4f5bc8fa19c0d645e83c447b2eba03bc22928502e08253336599dee214662162"
+  },
+  "validation": {
+    "sdk_tests_passed": 736,
+    "consumer_tests_passed": 9847,
+    "consumer_existing_skips": 53
+  },
+  "publication": "Exact previously verified package; no repack"
+}

@@ -1,122 +1,61 @@
-name: Build and Publish NuGet Packages
+name: Publish verified Common 3.11.41
 
 on:
-  push:
-    branches: [development, main]
-    tags: ["v*.*.*"]
-  pull_request:
-    branches: [development, main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-qimerp-shared-common-3.11.41
+  cancel-in-progress: false
+
 jobs:
-  build-and-publish:
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+  publish:
+    runs-on: [self-hosted, qimerp-ci]
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          dotnet-version: 9.0.x
+          persist-credentials: false
 
-      - name: Fix documentation paths
+      - name: Verify frozen package and source provenance
+        working-directory: .release
         run: |
-          ROOT_DIR=$(pwd)
-          
-          # Map SDK project names to their documentation files
-          declare -A SDK_DOCS=(
-            ["QFace.Sdk.ActorSystems"]="actor-system.md"
-            ["QFace.Sdk.RabbitMq"]="rabbitmq-messaging.md"
-            ["QFace.Sdk.RedisMq"]="rabbitmq-messaging.md"
-            ["QFace.Sdk.SendMessage"]="send-message.md"
-            ["QFace.Sdk.BlobStorage"]="blob-storage.md"
-            ["QFace.Sdk.MongoDb"]="mongodb.md"
-            ["QFace.Sdk.MongoDb.MultiTenant"]="mongodb.md"
-            ["QFace.Sdk.ElasticSearch"]="elasticsearch.md"
-            ["QFace.Sdk.Kafka"]="kafka-streaming.md"
-            ["QFace.Sdk.Logging"]="logging.md"
-            ["QFace.Sdk.Extensions"]="extensions.md"
-            ["QFace.Sdk.AI"]="ai-sdk.md"
-          )
-          
-          for project_dir in ./src/QFace.Sdk.*; do
-            project_name=$(basename "$project_dir")
-            echo "Processing $project_name..."
-            
-            # Skip template projects
-            if [[ "$project_name" == "QFace.WebApi.Template" ]]; then
-              echo "Skipping template project: $project_name"
-              continue
-            fi
-            
-            # Create docs directory structure
-            mkdir -p "$project_dir/docs/shared"
-            
-            # Copy README.md
-            if [ -f "README.md" ]; then
-              cp README.md "$project_dir/"
-              echo "  ✓ Copied README.md"
-            fi
-            
-            # Copy SDK-specific documentation if mapped
-            doc_file="${SDK_DOCS[$project_name]}"
-            if [ -n "$doc_file" ] && [ -f "docs/$doc_file" ]; then
-              cp "docs/$doc_file" "$project_dir/docs/"
-              echo "  ✓ Copied docs/$doc_file"
-            else
-              echo "  ⚠ No documentation mapping found for $project_name"
-            fi
-            
-            # Copy shared documentation
-            if [ -d "docs/shared" ]; then
-              cp -r docs/shared/* "$project_dir/docs/shared/"
-              echo "  ✓ Copied shared documentation"
-            fi
-            
-            # Update .csproj file paths
-            project_file="$project_dir/$project_name.csproj"
-            if [ -f "$project_file" ]; then
-              sed -i 's|<None Include="\$(SolutionDir)README.md"|<None Include="README.md"|g' "$project_file"
-              sed -i 's|<None Include="\$(SolutionDir)docs/|<None Include="docs/|g' "$project_file"
-              echo "  ✓ Updated .csproj paths"
-            fi
-            
-            echo ""
-          done
-          
-          echo "Documentation setup complete!"
+          set -euo pipefail
+          sha256sum --check QimErp.Shared.Common.3.11.41.nupkg.sha256
+          python3 - <<'PYTHON'
+          import hashlib, json, pathlib, urllib.request, xml.etree.ElementTree as ET, zipfile
+          root = pathlib.Path.cwd().parent
+          manifest = json.loads(pathlib.Path("provenance.json").read_text())
+          assert manifest["sha256"] == "32b1a1e413e065a2331c4df2921cc602a797578b15fd00d730efd9f9352be89e"
+          assert hashlib.sha256(pathlib.Path("QimErp.Shared.Common.3.11.41.nupkg").read_bytes()).hexdigest() == manifest["sha256"]
+          for name, digest in manifest["source_hashes"].items():
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
+          with zipfile.ZipFile("QimErp.Shared.Common.3.11.41.nupkg") as archive:
+              spec = ET.fromstring(archive.read("QimErp.Shared.Common.nuspec"))
+              ns = {"n": "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd"}
+              assert spec.find("n:metadata/n:id", ns).text == "QimErp.Shared.Common"
+              assert spec.find("n:metadata/n:version", ns).text == "3.11.41"
+          with urllib.request.urlopen("https://api.nuget.org/v3-flatcontainer/qimerp.shared.common/index.json", timeout=30) as response:
+              versions = json.load(response)["versions"]
+          if "3.11.41" in versions:
+              raise SystemExit("3.11.41 is already public; verify its contents before any further publication.")
+          print("Frozen artifact, provenance, identity and unpublished version verified.")
+          PYTHON
 
-      - name: Build and Pack NuGet projects
+      - name: Locate installed .NET 9
         run: |
-          mkdir -p ./nupkgs
+          set -euo pipefail
+          dotnet_bin="${HOME}/.dotnet/dotnet"
+          "$dotnet_bin" --list-sdks | grep '^9\.0\.' >/dev/null
+          echo "${HOME}/.dotnet" >> "$GITHUB_PATH"
 
-          for project in ./src/*/*.csproj; do
-            project_name=$(basename "$(dirname "$project")")
-
-            if ! grep -q "<PackageId>" "$project"; then
-              echo "  ⏭ Skipping $project_name (no PackageId)"
-              continue
-            fi
-            if grep -q "<IsPackable>false</IsPackable>" "$project"; then
-              echo "  ⏭ Skipping $project_name (IsPackable=false)"
-              continue
-            fi
-
-            echo "📦 Processing $project_name..."
-            # Restore against both the local nupkgs folder (for packages already packed
-            # earlier in this same loop iteration) and nuget.org — otherwise a commit that
-            # bumps several interdependent SDK packages together fails NU1102 here, since
-            # the "Publish to NuGet" step only runs after this whole loop completes.
-            dotnet restore "$project" -s ./nupkgs -s https://api.nuget.org/v3/index.json
-            dotnet build "$project" -c Release --no-restore
-            dotnet pack "$project" -c Release --no-build -o ./nupkgs
-          done
-
-          echo "Created packages:"
-          ls -la ./nupkgs/
-
-      - name: Publish to NuGet
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      - name: Publish exact verified artifact to nuget.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push ./nupkgs/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+          set -euo pipefail
+          test -n "$NUGET_API_KEY"
+          dotnet nuget push .release/QimErp.Shared.Common.3.11.41.nupkg \
+            --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json

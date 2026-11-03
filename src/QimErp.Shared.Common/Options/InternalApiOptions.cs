@@ -12,4 +12,5 @@ public class InternalApiOptions
     /// <c>InternalApiAuthFilter</c>; a service exposing /internal routes must configure it.
     /// </summary>
     public string ExpectedApiKey { get; set; } = string.Empty;
+    public TimeSpan SignedTenantValidity { get; set; } = TimeSpan.FromMinutes(2);
 }
