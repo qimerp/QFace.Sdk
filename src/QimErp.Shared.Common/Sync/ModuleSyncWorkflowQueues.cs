@@ -9,6 +9,8 @@ public static class ModuleSyncWorkflowQueues
     public const string JournalEntryPostedParent = "qimerp-finance-journal-entry-posted-sync";
     public const string TenantReferenceSyncParent = "qimerp-platform-tenant-reference-sync";
     public const string StockIssueSyncParent = "qimerp-finance-ar-stock-issue-sync";
+    public const string ProjectBillSyncParent = "qimerp-finance-ar-project-bill-sync";
+    public const string InventoryValuationGlParent = "qimerp-finance-gl-inventory-valuation";
     public const string CustomerSyncParent = "qimerp-finance-ar-customer-sync";
     public const string VendorSyncParent = "qimerp-finance-ap-vendor-sync";
     public const string PersonErasureParent = "qimerp-corehr-person-erasure";
