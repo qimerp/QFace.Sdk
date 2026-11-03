@@ -26,13 +26,13 @@
     <PackageReference Include="Akka" Version="1.5.0" />
     <PackageReference Include="Akka.DependencyInjection" Version="1.5.0" />
     <PackageReference Include="Azure.Identity" Version="1.11.4" />
-    <PackageReference Include="MailKit" Version="4.0.0" />
+    <PackageReference Include="MailKit" Version="4.16.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
     <PackageReference Include="Microsoft.Graph" Version="5.62.0" />
-    <PackageReference Include="MimeKit" Version="4.0.0" />
+    <PackageReference Include="MimeKit" Version="4.16.0" />
 </ItemGroup>
 <ItemGroup>
     <ProjectReference Include="..\QFace.Sdk.ActorSystems\QFace.Sdk.ActorSystems.csproj" />
