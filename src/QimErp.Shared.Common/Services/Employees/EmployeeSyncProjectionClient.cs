@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Globalization;
+using QimErp.Shared.Common.Filters;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using QimErp.Shared.Common.Contracts;
@@ -12,7 +14,8 @@ public sealed class EmployeeSyncProjectionClient(
     IConfiguration configuration,
     IOptions<InternalApiOptions> internalApiOptions,
     ICurrentUserService currentUserService,
-    ILogger<EmployeeSyncProjectionClient> logger) : IEmployeeSyncProjectionClient
+    ILogger<EmployeeSyncProjectionClient> logger,
+    TimeProvider timeProvider) : IEmployeeSyncProjectionClient
 {
     public const string HttpClientName = nameof(EmployeeSyncProjectionClient);
 
@@ -51,13 +54,16 @@ public sealed class EmployeeSyncProjectionClient(
         }
 
         var client = httpClientFactory.CreateClient(HttpClientName);
-        client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
-        client.DefaultRequestHeaders.Remove("X-Internal-Api-Key");
-        client.DefaultRequestHeaders.Add("X-Internal-Api-Key", apiKey);
-
-        var path =
-            $"internal/employees/{employeeId:D}/{resource}?tenantId={Uri.EscapeDataString(tenantId.Trim())}";
-        var response = await client.GetAsync(path, cancellationToken);
+        var tenant = tenantId.Trim();
+        var path = $"/internal/employees/{employeeId:D}/{resource}";
+        var timestamp = timeProvider.GetUtcNow();
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(baseUrl.TrimEnd('/') + "/"), path.TrimStart('/')));
+        request.Headers.Add("X-Internal-Api-Key", apiKey);
+        request.Headers.Add(InternalServiceSignature.TenantHeader, tenant);
+        request.Headers.Add(InternalServiceSignature.TimestampHeader, timestamp.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+        request.Headers.Add(InternalServiceSignature.SignatureHeader,
+            InternalServiceSignature.Sign(apiKey, tenant, request.Method.Method, path, timestamp));
+        using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
 

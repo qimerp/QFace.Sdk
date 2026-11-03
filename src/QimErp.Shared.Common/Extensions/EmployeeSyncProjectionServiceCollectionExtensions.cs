@@ -1,4 +1,5 @@
 using QimErp.Shared.Common.Services.Employees;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace QimErp.Shared.Common.Extensions;
 
@@ -10,6 +11,7 @@ public static class EmployeeSyncProjectionServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddEmployeeSyncProjectionClient(this IServiceCollection services)
     {
+        services.TryAddSingleton(TimeProvider.System);
         services.AddHttpClient(EmployeeSyncProjectionClient.HttpClientName);
         services.AddScoped<IEmployeeSyncProjectionClient, EmployeeSyncProjectionClient>();
         return services;
