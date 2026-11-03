@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: publish-qimerp-shared-common-3.11.41
@@ -51,9 +52,15 @@ jobs:
           "$dotnet_bin" --list-sdks | grep '^9\.0\.' >/dev/null
           echo "${HOME}/.dotnet" >> "$GITHUB_PATH"
 
+      - name: Authenticate with NuGet trusted publishing
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
+        with:
+          user: iamqwame
+
       - name: Publish exact verified artifact to nuget.org
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
           set -euo pipefail
           test -n "$NUGET_API_KEY"
