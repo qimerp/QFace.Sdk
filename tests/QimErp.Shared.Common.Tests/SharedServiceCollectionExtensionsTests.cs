@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using QimErp.Shared.Common.Entities;
@@ -100,5 +101,75 @@ public class SharedServiceCollectionExtensionsTests
         // Assert
         consumer.Should().NotBeNull();
         interceptor.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddDbContextWithOutbox_RegistersOutboxProcessorBackgroundService_ExactlyOnce()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContextWithOutbox<TestApplicationDbContext>(TestConnectionString);
+
+        using var provider = services.BuildServiceProvider();
+        var hostedServices = provider.GetServices<IHostedService>()
+            .OfType<OutboxRelayHostedService>()
+            .ToList();
+
+        hostedServices.Should().ContainSingle(
+            "AddDbContextWithOutbox must register the Akka outbox relay hosted service");
+    }
+
+    [Fact]
+    public void AddDbContextWithOutbox_CalledTwice_StillRegistersOutboxRelayOnce()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContextWithOutbox<TestApplicationDbContext>(TestConnectionString);
+        services.AddDbContextWithOutbox<TestApplicationDbContext>(TestConnectionString);
+
+        using var provider = services.BuildServiceProvider();
+        var hostedServices = provider.GetServices<IHostedService>()
+            .OfType<OutboxRelayHostedService>()
+            .ToList();
+
+        hostedServices.Should().ContainSingle(
+            "OutboxRelayHostedService must not duplicate when AddDbContextWithOutbox is called more than once");
+    }
+
+    [Fact]
+    public void AddDbContextWithOutbox_WithoutConfiguration_UsesDefaultOutboxOptions()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContextWithOutbox<TestApplicationDbContext>(TestConnectionString);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<OutboxOptions>>().Value;
+
+        options.BatchSize.Should().Be(100);
+        options.RelayEnabled.Should().BeTrue();
+        options.DefaultTransports.Should().Equal(OutboxTransports.InProcess);
+    }
+
+    [Fact]
+    public void AddDbContextWithOutbox_WithConfiguration_BindsOutboxOptions()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{OutboxOptions.SectionName}:BatchSize"] = "25",
+                [$"{OutboxOptions.SectionName}:RelayEnabled"] = "false"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContextWithOutbox<TestApplicationDbContext>(TestConnectionString, configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<OutboxOptions>>().Value;
+
+        options.BatchSize.Should().Be(25);
+        options.RelayEnabled.Should().BeFalse();
     }
 }

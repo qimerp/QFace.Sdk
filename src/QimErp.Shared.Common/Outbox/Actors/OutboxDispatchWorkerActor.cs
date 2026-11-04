@@ -43,9 +43,11 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
 
             await transport.SendAsync(EventEnvelope.From(msg), CancellationToken.None);
             await store.MarkProcessedAsync(msg.Id, CancellationToken.None);
+            OutboxMetrics.RecordProcessed();
         }
         catch (Exception ex)
         {
+            OutboxMetrics.RecordFailed();
             var attempts = msg.Attempts + 1;
             var delaySeconds = Math.Min(300, Math.Pow(2, attempts));
             var dead = attempts >= Math.Max(1, _options.MaxAttempts);

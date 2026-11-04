@@ -1,6 +1,10 @@
 namespace QimErp.Shared.Common.Events;
 
-
+/// <summary>
+/// Legacy fat employee sync payload. Prefer <see cref="EmployeeChangedEventV2"/> (DATA-11/25).
+/// Kept for dual-publish until all consumers migrate; do not add new PII fields.
+/// </summary>
+[Obsolete("DATA-11/25: use EmployeeChangedEventV2 (Ids-only). Dual-published until consumers migrate.")]
 public class EmployeeChangedEvent : DomainEvent
 {
     public string EmployeeId { get; set; } = string.Empty;
@@ -130,6 +134,15 @@ public class EmployeeChangedEvent : DomainEvent
     public EmployeeChangedEvent WithTaxIdentificationNumber(string? tin) { TaxIdentificationNumber = tin; return this; }
     public EmployeeChangedEvent WithNhilNumber(string? nhil) { NhilNumber = nhil; return this; }
     public EmployeeChangedEvent WithGhanaCardNumber(string? card) { GhanaCardNumber = card; return this; }
+
+    public EmployeeChangedEvent StripGovernmentIds()
+    {
+        SsnitNumber = null;
+        TaxIdentificationNumber = null;
+        NhilNumber = null;
+        GhanaCardNumber = null;
+        return this;
+    }
     
     public EmployeeChangedEvent WithOrganizationalUnit(Guid? id, string? name, string? code = null) 
     { 
@@ -196,6 +209,47 @@ public class EmployeeChangedEvent : DomainEvent
             SendInvitation = false;
         }
         return this;
+    }
+
+    /// <summary>
+    /// Projects this legacy payload onto the Ids-only V2 envelope (drops PII/display fields).
+    /// </summary>
+    public EmployeeChangedEventV2 ToV2(string? correlationId = null)
+    {
+        _ = Guid.TryParse(EmployeeId, out var employeeId);
+        return new EmployeeChangedEventV2
+        {
+            EventId = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            EmployeeId = employeeId,
+            Version = Version,
+            OccurredAt = OccurredOn.Kind == DateTimeKind.Unspecified
+                ? new DateTimeOffset(DateTime.SpecifyKind(OccurredOn, DateTimeKind.Utc))
+                : new DateTimeOffset(OccurredOn),
+            CorrelationId = correlationId ?? CorrelationId ?? string.Empty,
+            CompanyId = CompanyId,
+            IsVisibleAcrossCompanies = IsVisibleAcrossCompanies,
+            GrantCompanyId = GrantCompanyId,
+            RevokeCompanyId = RevokeCompanyId,
+            Code = Code,
+            EmployeeNo = EmployeeNo,
+            ReferenceCode = ReferenceCode,
+            IsActive = IsActive,
+            EmploymentStatus = EmploymentStatus,
+            WorkWeekDays = WorkWeekDays,
+            DateOfEmployment = DateOfEmployment,
+            JobTitleId = JobTitleId,
+            OrganizationalUnitId = OrganizationalUnitId,
+            LocationId = LocationId,
+            LocationGeographyResolved = LocationGeographyResolved,
+            SupervisorId = SupervisorId,
+            JobStatusId = JobStatusId,
+            SendInvitation = SendInvitation,
+            SetDefaultPassword = SetDefaultPassword,
+            MustChangePassword = MustChangePassword,
+            IsSeed = IsSeed,
+            SelectedModules = SyncSelectedModules
+        };
     }
 }
 

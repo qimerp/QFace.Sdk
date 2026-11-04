@@ -31,12 +31,14 @@ internal sealed class EfOutbox(
     public void Add(string eventType, string tenantId, Guid entityId, long entityVersion, object payload)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentNullException.ThrowIfNull(payload);
 
         var now = clock.GetUtcNow();
         var payloadJson = JsonSerializer.Serialize(payload, payload.GetType(), _json);
 
-        foreach (var transport in routing.TransportsFor(eventType))
+        var transports = routing.TransportsFor(eventType).ToList();
+        foreach (var transport in transports)
         {
             db.Set<OutboxMessage>().Add(new OutboxMessage
             {
@@ -51,5 +53,7 @@ internal sealed class EfOutbox(
                 NextAttemptAt = now,
             });
         }
+
+        OutboxMetrics.RecordEnqueued(transports.Count);
     }
 }

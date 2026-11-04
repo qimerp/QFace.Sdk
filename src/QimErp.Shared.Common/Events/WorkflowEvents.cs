@@ -2,7 +2,7 @@ namespace QimErp.Shared.Common.Events;
 
 public class WorkflowStatusChangedEvent : IDomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string EntityType { get; set; } = "";
     public string EntityId { get; set; } = "";
@@ -13,13 +13,13 @@ public class WorkflowStatusChangedEvent : IDomainEvent
     public string Module { get; set; } = ""; // HR, Finance, etc.
     public Dictionary<string, object> EntityData { get; set; } = new();
     public DateTime OccurredOn { get; }
-    public string TenantId { get; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
     public string? TriggeredBy { get; }
 }
 
 public class WorkflowApprovalRequiredEvent : DomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string EntityType { get; set; } = "";
     public string EntityId { get; set; } = "";
@@ -49,7 +49,7 @@ public class WorkflowApprovalRequiredEvent : DomainEvent
 
 public class WorkflowCompletedEvent : IDomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string EntityType { get; set; } = "";
     public string EntityId { get; set; } = "";
@@ -60,13 +60,13 @@ public class WorkflowCompletedEvent : IDomainEvent
     public string Module { get; set; } = "";
     public Dictionary<string, object> EntityData { get; set; } = new();
     public DateTime OccurredOn { get; }
-    public string TenantId { get; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
     public string? TriggeredBy { get; }
 }
 
 public class WorkflowTimeoutEvent : IDomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string EntityType { get; set; } = "";
     public string EntityId { get; set; } = "";
@@ -82,7 +82,7 @@ public class WorkflowTimeoutEvent : IDomainEvent
 
 public class WorkflowApprovalRequestEvent : DomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string WorkflowId { get; set; } = "";
     public string EntityType { get; set; } = "";
@@ -116,7 +116,7 @@ public class WorkflowApprovalRequestEvent : DomainEvent
 
 public class WorkflowApprovalProcessedEvent : DomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string WorkflowId { get; set; } = "";
     public string EntityType { get; set; } = "";
@@ -140,7 +140,7 @@ public class WorkflowApprovalProcessedEvent : DomainEvent
 
 public class WorkflowRejectionRequestEvent : DomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string WorkflowId { get; set; } = "";
     public string EntityType { get; set; } = "";
@@ -172,7 +172,7 @@ public class WorkflowRejectionRequestEvent : DomainEvent
 
 public class WorkflowReturnRequestEvent : DomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
+    public Guid EventId { get; } = Guid.CreateVersion7();
     public DateTime OccurredAt { get; } = DateTime.UtcNow;
     public string WorkflowId { get; set; } = "";
     public string EntityType { get; set; } = "";

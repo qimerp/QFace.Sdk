@@ -20,8 +20,9 @@ namespace QimErp.Shared.Common.Services;
 ///   entity-create across every module. Reads go through a tenant+company-scoped Redis
 ///   key (1h TTL) and writes (UpsertConfigAsync, ReconcileManualToAutoAsync,
 ///   CheckAndApplyResetAsync, GetOrCreateConfigAsync auto-create) invalidate
-///   it inline. The hot path GenerateBatchAsync still uses an atomic raw-SQL
-///   UPDATE … RETURNING for LastSequence — the cache only short-circuits the
+///   it inline. GenerateBatchAsync allocates via one atomic raw-SQL
+///   UPDATE … RETURNING when no reservations are active; the reservation-skip
+///   path is a documented DATA-27 residual. The cache only short-circuits the
 ///   format-and-mode lookup, never the sequence allocation itself.
 /// </summary>
 public abstract class EntityCodeService<TContext> : IEntityCodeService
@@ -32,6 +33,9 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
     protected readonly ILogger _logger;
 
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
+
+    // ≥ fan-out of concurrent InMemory GenerateAsync callers (product create test uses 10).
+    private const int NonRelationalConcurrencyAttempts = 12;
 
     private static string EffectiveCompanyId => CompanyContext.CurrentScope.EffectiveCompanyId;
 
@@ -85,12 +89,34 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
 
     public async Task<string[]> GenerateBatchAsync(string tenantId, string entityType, int count, CancellationToken ct = default)
     {
+        // DATA-24: fail closed before IgnoreQueryFilters — never probe all tenants.
+        EnsureTenantId(tenantId);
         if (count <= 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be ≥ 1.");
 
         var companyId = EffectiveCompanyId;
         var config = await GetOrCreateConfigAsync(tenantId, companyId, entityType, ct);
         await CheckAndApplyResetAsync(config, companyId, ct);
 
+        if (!await HasActiveReservationsAsync(tenantId, entityType, ct))
+        {
+            // DATA-27: one atomic sequence reservation for the full batch (no per-code UPDATE).
+            var finalSeq = await IncrementSequenceAsync(tenantId, companyId, entityType, count, ct);
+            var startSeq = finalSeq - count + 1;
+            var now = DateTimeOffset.UtcNow;
+            var batch = new string[count];
+            for (var i = 0; i < count; i++)
+                batch[i] = config.FormatCode(startSeq + i, now);
+            return batch;
+        }
+
+        return await GenerateBatchWithReservationSkipAsync(tenantId, companyId, entityType, count, config, ct);
+    }
+
+    // DATA-27 residual: active reservations require per-code skip checks; sequence bumps stay single-step.
+    private async Task<string[]> GenerateBatchWithReservationSkipAsync(
+        string tenantId, string companyId, string entityType, int count,
+        EntityCodeConfig config, CancellationToken ct)
+    {
         const int maxSkipAttempts = 100;
         var codes = new List<string>(count);
         var attempts = 0;
@@ -112,8 +138,30 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
         return codes.ToArray();
     }
 
+    private async Task<bool> HasActiveReservationsAsync(string tenantId, string entityType, CancellationToken ct)
+    {
+        var companyId = ReservationCompanyId(entityType);
+        var now = DateTimeOffset.UtcNow;
+
+        // IgnoreQueryFilters: explicit tenant+company scope below.
+        var expiries = await _context.Set<EntityCodeReservation>()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId
+                        && r.CompanyId == companyId
+                        && r.EntityType == entityType
+                        && r.DataStatus == DataState.Active)
+            .Select(r => r.ExpiresAt)
+            .ToListAsync(ct);
+
+        // DateTimeOffset ordering does not translate on SQLite; expiry is compared in memory.
+        return expiries.Any(e => e > now);
+    }
+
     public async Task<string> SuggestAsync(string tenantId, string entityType, CancellationToken ct = default)
     {
+        EnsureTenantId(tenantId);
+
         var companyId = EffectiveCompanyId;
         var config = await GetOrCreateConfigAsync(tenantId, companyId, entityType, ct);
         var seq = config.LastSequence + 1;
@@ -133,6 +181,8 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
 
     private async Task<EntityCodeConfig?> GetConfigAsync(string tenantId, string companyId, string entityType, CancellationToken ct)
     {
+        EnsureTenantId(tenantId);
+
         var key = CacheKey(tenantId, companyId, entityType);
         var cached = await _cache.GetAsync<EntityCodeConfig>(key);
         if (cached is not null) return cached;
@@ -155,6 +205,8 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
         CodeGenerationMode mode, CodeResetPeriod resetPeriod,
         CancellationToken ct = default)
     {
+        EnsureTenantId(tenantId);
+
         var companyId = EffectiveCompanyId;
 
         // Bypass the cache here so the upsert path always sees the latest DB row;
@@ -244,6 +296,8 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
         string tenantId, string entityType, string code, string reservationToken, TimeSpan ttl,
         bool validateFormat = true, string? metadata = null, CancellationToken ct = default)
     {
+        EnsureTenantId(tenantId);
+
         if (string.IsNullOrWhiteSpace(code))
             return (false, "Code cannot be empty.");
         if (string.IsNullOrWhiteSpace(reservationToken))
@@ -490,9 +544,7 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
     /// <summary>
     /// Atomically increments LastSequence by <paramref name="count"/> and returns the new value.
     /// Uses a raw SQL UPDATE … RETURNING so the increment is a single DB round-trip.
-    /// On non-relational providers (EF InMemory, used by test hosts) raw SQL isn't supported at all,
-    /// so this falls back to a plain tracked-entity increment — safe there only because those hosts
-    /// are single-threaded/non-concurrent, unlike the relational path this is not atomic.
+    /// Non-relational providers (EF InMemory) fall back to tracked-entity increment with Version retries.
     /// </summary>
     private async Task<long> IncrementSequenceAsync(
         string tenantId, string companyId, string entityType, int count, CancellationToken ct)
@@ -528,18 +580,30 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
     private async Task<long> IncrementSequenceNonAtomicAsync(
         string tenantId, string companyId, string entityType, int count, CancellationToken ct)
     {
-        var config = await _context.Set<EntityCodeConfig>()
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(e => e.TenantId == tenantId && e.CompanyId == companyId && e.EntityType == entityType, ct);
+        for (var attempt = 1; ; attempt++)
+        {
+            var config = await _context.Set<EntityCodeConfig>()
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    e => e.TenantId == tenantId && e.CompanyId == companyId && e.EntityType == entityType, ct);
 
-        if (config is null)
-            throw new InvalidOperationException(
-                $"EntityCodeConfig row not found for ({tenantId}, {companyId}, {entityType}). " +
-                "Ensure the config exists before calling GenerateAsync.");
+            if (config is null)
+                throw new InvalidOperationException(
+                    $"EntityCodeConfig row not found for ({tenantId}, {companyId}, {entityType}). " +
+                    "Ensure the config exists before calling GenerateAsync.");
 
-        var finalSeq = config.IncrementSequenceBy(count);
-        await _context.SaveChangesAsync(ct);
-        return finalSeq;
+            var finalSeq = config.IncrementSequenceBy(count);
+            try
+            {
+                await _context.SaveChangesAsync(ct);
+                return finalSeq;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < NonRelationalConcurrencyAttempts)
+            {
+                foreach (var entry in _context.ChangeTracker.Entries<EntityCodeConfig>().ToList())
+                    await entry.ReloadAsync(ct);
+            }
+        }
     }
 
     private async Task CheckAndApplyResetAsync(EntityCodeConfig config, string companyId, CancellationToken ct)
@@ -556,6 +620,13 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
         _logger.LogInformation(
             "Sequence reset for {EntityType} on tenant {TenantId} — new period {Key}",
             config.EntityType, config.TenantId, currentKey);
+    }
+
+    // DATA-24: blank TenantId must never reach IgnoreQueryFilters probes.
+    private static void EnsureTenantId(string tenantId)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            throw new ArgumentException("TenantId is required.", nameof(tenantId));
     }
 
     private static long? ExtractNumericSuffix(string code)

@@ -27,11 +27,12 @@ public class TenantActivityPublisherActor : BaseActor
 
                 await workflowStarter.StartOrIgnoreAsync<IRecordTenantActivityWorkflow>(
                     message.WorkflowId,
-                    $"qimerp-iam-tenant-activity{suffix}",
+                    $"qimerp-platform-tenant-activity{suffix}",
                     wf => wf.RunAsync(message.Request));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // DATA-12: observability fire-and-forget — failure must not fail the caller (DECISIONS 2026-10-20).
                 logger.LogWarning(ex,
                     "Failed to start tenant activity workflow {WorkflowId} for tenant {TenantId}",
                     message.WorkflowId,

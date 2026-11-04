@@ -31,6 +31,7 @@ public static class BaseModelResolver
         ModuleKeys.CashManagement,
         ModuleKeys.Inventory,
         ModuleKeys.Project,
+        ModuleKeys.Attendance,
         ModuleKeys.POS,
         ModuleKeys.Reporting,
     };

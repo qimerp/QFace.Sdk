@@ -65,6 +65,8 @@ public abstract class ApplicationDbContext<TContext>(
     {
         base.ConfigureConventions(configurationBuilder);
 
+        configurationBuilder.Properties<Enum>().HaveConversion<string>();
+        configurationBuilder.Conventions.Add(_ => new EnumToStringConvention());
         configurationBuilder.Conventions.Add(_ => new TenantCompanyQueryFilterConvention(this));
     }
 

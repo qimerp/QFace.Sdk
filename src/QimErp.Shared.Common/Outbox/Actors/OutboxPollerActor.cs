@@ -52,6 +52,8 @@ internal sealed class OutboxPollerActor : ReceiveActor, IWithTimers
                 _options.ClaimLease,
                 CancellationToken.None);
 
+            OutboxMetrics.RecordSweepBatch(batch.Count);
+
             foreach (var msg in batch)
                 _router.Tell(new OutboxDispatch(msg));
 

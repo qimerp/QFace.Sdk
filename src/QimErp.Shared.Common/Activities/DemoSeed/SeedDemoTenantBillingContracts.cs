@@ -5,7 +5,7 @@ namespace QimErp.Shared.Common.Activities.DemoSeed;
 /// <summary>
 /// TenantBilling-side child workflow that seeds demo subscriptions, invoices,
 /// payment methods, and usage records for the seeded tenant.
-/// Owned by qimerp-iam-tenant-billing-demo-seed task queue.
+/// Owned by qimerp-platform-tenant-billing-demo-seed task queue.
 /// </summary>
 [Workflow("SeedDemoTenantBillingWorkflow")]
 public interface ISeedDemoTenantBillingWorkflow

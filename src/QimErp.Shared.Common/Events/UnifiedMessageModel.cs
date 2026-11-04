@@ -19,6 +19,7 @@ public class UnifiedMessageModel
     /// <summary>Template name (no extension). Notifications module resolves + renders it.
     /// Ignored when <see cref="Template"/> already contains pre-rendered HTML.</summary>
     public string? TemplateCode { get; set; }
+    // Persisted in plaintext in Temporal history; never put tokens, passwords or reset links here.
     public Dictionary<string, string> Replacements { get; set; } = new();
 
     // SMS properties
@@ -35,14 +36,12 @@ public class UnifiedMessageModel
     public Dictionary<string, string> Metadata { get; set; } = new();
 
     /// <summary>
-    /// Owning tenant. Read by <c>TenantContextActivityInterceptor</c> (it reflects a
-    /// <c>TenantId</c> property off the activity input) to seed the ambient tenant context
-    /// before the notification <c>Send</c> activity runs — without it the tenant-scoped
-    /// <c>NotificationHistory</c> read/write executes with an unseeded EF filter and the
-    /// activity fails ("No TenantId on input for activity Send"). Stamped by
-    /// <c>NotificationWorkflowStarter</c> from the ambient tenant when not already set.
+    /// Owning tenant. Required for the notification worker's
+    /// <c>TenantContextActivityInterceptor</c>. Stamped by
+    /// <c>NotificationWorkflowStarter</c> from ambient context when unset; send fails closed
+    /// if still empty after stamp.
     /// </summary>
-    public string? TenantId { get; set; }
+    public string TenantId { get; set; } = string.Empty;
 
     /// <summary>
     /// Optional file attachments (e.g. payslip PDF).  Serialised through Temporal

@@ -20,6 +20,8 @@ public class TaxationShared : GuidAuditableEntity
     public string LegalNotes { get; set; } = string.Empty;
     public string IncludedInPrice { get; set; } = string.Empty;
     public bool AffectsSubsequentTaxes { get; set; } // Defaults to false
+    public DateOnly? ValidFrom { get; set; }
+    public DateOnly? ValidTo { get; set; }
 
     // Public read-only access to distributions
     public IReadOnlyList<TaxDistributionLineShared> InvoiceDistributions => _invoiceDistributions.AsReadOnly();
@@ -123,6 +125,36 @@ public class TaxationShared : GuidAuditableEntity
         return this;
     }
 
+    public TaxationShared WithValidFrom(DateOnly? validFrom)
+    {
+        ValidFrom = validFrom;
+        return this;
+    }
+
+    public TaxationShared WithValidTo(DateOnly? validTo)
+    {
+        ValidTo = validTo;
+        return this;
+    }
+
+    public bool AppliesOn(DateOnly documentDate)
+    {
+        if (!IsActive)
+            return false;
+
+        if (ValidFrom is { } from && ValidTo is { } to && from > to)
+            return false;
+
+        if (ValidFrom is { } validFrom && documentDate < validFrom)
+            return false;
+
+        // ValidTo is inclusive.
+        if (ValidTo is { } validTo && documentDate > validTo)
+            return false;
+
+        return true;
+    }
+
     public TaxationShared AddInvoiceDistribution(string baseOn, decimal? percentage, string taxGrid, string? accountId,
         string? accountName, string? accountCode = "")
     {
@@ -179,11 +211,28 @@ public class TaxationShared : GuidAuditableEntity
                 .WithLegalNotes("Creditable input tax from Jan 2026")
                 .AddDistribution("20303", "GETFund Output Payable"),
 
+            Create("COVID Levy", 1m)
+                .WithComputationMethod()
+                .WithType(TaxationConstants.TaxType.Sales)
+                .WithTaxGroup("COVID")
+                .WithSequence(3)
+                .WithDescription("COVID-19 Health Recovery Levy at 1%")
+                .WithValidTo(new DateOnly(2025, 12, 31))
+                .AddDistribution("20304", "COVID Health Recovery Levy Payable"),
+
+            Create("CST", 5m)
+                .WithComputationMethod()
+                .WithType(TaxationConstants.TaxType.Sales)
+                .WithTaxGroup("CST")
+                .WithSequence(4)
+                .WithDescription("Communication service tax at 5%")
+                .AddDistribution("20305", "Communication Service Tax Payable"),
+
             Create("VAT", 15m)
                 .WithComputationMethod()
                 .WithType(TaxationConstants.TaxType.Sales)
                 .WithTaxGroup("VAT")
-                .WithSequence(3)
+                .WithSequence(5)
                 .WithDescription("Standard VAT rate per VAT Act 2025 (Act 1151), effective Jan 2026")
                 .AddDistribution("20301", "VAT Output Payable"),
 
@@ -192,7 +241,7 @@ public class TaxationShared : GuidAuditableEntity
                 .WithType(TaxationConstants.TaxType.Sales)
                 .WithTaxGroup("VAT")
                 .WithLabelOnInvoices("0% VAT")
-                .WithSequence(4)
+                .WithSequence(6)
                 .WithDescription("Healthcare, education, financial services, and specified agricultural goods.")
                 .AddDistribution(),
 
@@ -212,11 +261,28 @@ public class TaxationShared : GuidAuditableEntity
                 .WithDescription("Input GETFund — creditable per Act 1151")
                 .AddDistribution("50700", "Purchase Tax"),
 
+            Create("COVID Levy (Purchase)", 1m)
+                .WithComputationMethod()
+                .WithType(TaxationConstants.TaxType.Purchases)
+                .WithTaxGroup("COVID")
+                .WithSequence(7)
+                .WithDescription("Input COVID-19 Health Recovery Levy at 1%")
+                .WithValidTo(new DateOnly(2025, 12, 31))
+                .AddDistribution("50700", "Purchase Tax"),
+
+            Create("CST (Purchase)", 5m)
+                .WithComputationMethod()
+                .WithType(TaxationConstants.TaxType.Purchases)
+                .WithTaxGroup("CST")
+                .WithSequence(8)
+                .WithDescription("Input communication service tax at 5%")
+                .AddDistribution("50700", "Purchase Tax"),
+
             Create("VAT (Purchase)", 15m)
                 .WithComputationMethod()
                 .WithType(TaxationConstants.TaxType.Purchases)
                 .WithTaxGroup("VAT")
-                .WithSequence(7)
+                .WithSequence(9)
                 .WithDescription("Input VAT at 15% per Act 1151")
                 .AddDistribution("50700", "Purchase Tax")
         ];

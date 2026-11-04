@@ -8,13 +8,13 @@ namespace QimErp.Shared.Common.Sync;
 /// <list type="bullet">
 /// <item><b>IAM</b> — <see cref="SyncType.Employee"/> subscriber with <c>RequiresModuleSelection=false</c>; invitation/password flags only.</item>
 /// <item><b>TenantBilling</b> — employee seat count; always runs when employee sync fires.</item>
-/// <item><b>Workflow</b> — actor sync when <see cref="ModuleKeys.Workflow"/> is selected; handled in <c>EmployeeSyncWorkflow</c>, not this table.</item>
+/// <item><b>Workflow</b> — <see cref="SyncType.Employee"/> actor sync when selected is handled in <c>EmployeeSyncWorkflow</c>; <see cref="SyncType.PersonErasure"/> fans out via this table.</item>
 /// </list>
 /// Cross-module business events (AP↔Inventory, AR↔Project) stay on dedicated per-contract workflows — not install fan-out.
 /// </summary>
 public static class ModuleSyncRegistry
 {
-    public const string LoadTenantModulesQueue = "qimerp-iam-tenant-activity";
+    public const string LoadTenantModulesQueue = "qimerp-platform-tenant-activity";
     public const string LoadTenantModulesActivityName = "LoadTenantModules";
 
     private static readonly ModuleSyncDefinition[] Modules =
@@ -82,7 +82,8 @@ public static class ModuleSyncRegistry
         new("cash-management", ModuleKeys.CashManagement,
             ["SetupCashManagementTenant"],
             RequiresItemKey: "core-accounting",
-            PrerequisiteItemKeys: ["core-accounting"]),
+            PrerequisiteItemKeys: ["core-accounting"],
+            EmployeeBackfillStep: "EnsureEmployeeInCashManagement"),
         new("inventory", ModuleKeys.Inventory, ["SetupOperationsInventoryTenant"], SampleSeedStep: "SeedSampleInventory"),
         new("pos", ModuleKeys.POS, ["SetupPosTenant"], RequiresItemKey: "inventory", PrerequisiteItemKeys: ["inventory"], SampleSeedStep: "SeedSamplePos"),
         new("project", ModuleKeys.Project,
@@ -155,13 +156,13 @@ public static class ModuleSyncRegistry
 
     private static readonly SetupStepRoute[] SetupRoutes =
     [
-        new("EnsureSubscription", "qimerp-iam-tenant-setup"),
-        new("SyncSubscriptionModules", "qimerp-iam-tenant-setup"),
+        new("EnsureSubscription", "qimerp-platform-tenant-setup"),
+        new("SyncSubscriptionModules", "qimerp-platform-tenant-setup"),
         new("CreateFirstEmployee", "qimerp-corehr-employee-tenant-setup"),
-        new("AssignSuperAdminRole", "qimerp-iam-tenant-onboarding"),
-        new("SetupIAMTenant", "qimerp-iam-tenant-onboarding"),
-        new("SeedTenantReferenceData", "qimerp-iam-tenant-onboarding"),
-        new("RepublishTenantReferenceSync", "qimerp-iam-tenant-onboarding"),
+        new("AssignSuperAdminRole", "qimerp-platform-tenant-onboarding"),
+        new("SetupIAMTenant", "qimerp-platform-tenant-onboarding"),
+        new("SeedTenantReferenceData", "qimerp-platform-tenant-onboarding"),
+        new("RepublishTenantReferenceSync", "qimerp-platform-tenant-onboarding"),
         new("SetupCoreHrTenant", "qimerp-corehr-employee-tenant-setup"),
         new("SetupPayrollTenant", "qimerp-payroll-tenant-setup"),
         new("SetupBenefitTenant", "qimerp-benefit-tenant-setup"),
@@ -179,11 +180,11 @@ public static class ModuleSyncRegistry
         new("InitialSetupTalent", "qimerp-talent-tenant-setup"),
         new("InitialSetupWorkforcePlanning", "qimerp-workforceplanning-tenant-setup"),
         new("InitialSetupWorkflow", "qimerp-workflow-tenant-setup"),
-        new("SetupAccountingGlTenant", "qimerp-accounting-gl-tenant-setup"),
-        new("SetupAccountingApTenant", "qimerp-accounting-ap-tenant-setup"),
-        new("SetupAccountingArTenant", "qimerp-accounting-ar-tenant-setup"),
-        new("SetupBudgetPlanningTenant", "qimerp-accounting-budget-tenant-setup"),
-        new("SetupCashManagementTenant", "qimerp-accounting-cash-tenant-setup"),
+        new("SetupAccountingGlTenant", "qimerp-finance-gl-tenant-setup"),
+        new("SetupAccountingApTenant", "qimerp-finance-ap-tenant-setup"),
+        new("SetupAccountingArTenant", "qimerp-finance-ar-tenant-setup"),
+        new("SetupBudgetPlanningTenant", "qimerp-finance-budget-tenant-setup"),
+        new("SetupCashManagementTenant", "qimerp-finance-cash-tenant-setup"),
         new("SetupOperationsInventoryTenant", "qimerp-operations-inventory-tenant-setup"),
         new("SetupPosTenant", "qimerp-operations-pos-tenant-setup"),
         new("SetupOperationsProjectTenant", "qimerp-operations-project-tenant-setup"),
@@ -199,6 +200,7 @@ public static class ModuleSyncRegistry
         new("EnsureEmployeeInRecruitment", "qimerp-recruitment-tenant-setup"),
         new("EnsureEmployeeInSurveys", "qimerp-surveys-tenant-setup"),
         new("EnsureEmployeeInProject", "qimerp-operations-project-employee-sync"),
+        new("EnsureEmployeeInCashManagement", "qimerp-finance-cash-management-employee-sync"),
 
         // Plugin enable/disable — dispatched to the owning module's existing setup queue,
         // no new worker process.
@@ -248,13 +250,14 @@ public static class ModuleSyncRegistry
         new(SyncType.Employee, ModuleKeys.Recruitment, "qimerp-recruitment-employee-sync", "Recruitment"),
         new(SyncType.Employee, ModuleKeys.EmployeeEngagement, "qimerp-employeeengagement-employee-sync", "EmployeeEngagement"),
         new(SyncType.Employee, ModuleKeys.Surveys, "qimerp-surveys-employee-sync", "Surveys"),
-        new(SyncType.Employee, null, "qimerp-iam-employee-sync", "IAM", RequiresModuleSelection: false),
+        new(SyncType.Employee, null, "qimerp-platform-employee-sync", "IAM", RequiresModuleSelection: false),
         new(SyncType.Employee, ModuleKeys.Project, "qimerp-operations-project-employee-sync", "Project"),
-        new(SyncType.Employee, null, "qimerp-iam-tenantbilling-employee-sync", "TenantBilling", RequiresModuleSelection: false),
+        new(SyncType.Employee, ModuleKeys.CashManagement, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
+        new(SyncType.Employee, null, "qimerp-platform-tenantbilling-employee-sync", "TenantBilling", RequiresModuleSelection: false),
 
         new(SyncType.AdminData, ModuleKeys.CoreHR, "qimerp-corehr-employee-admin-sync", "Employee"),
         new(SyncType.AdminData, ModuleKeys.Payroll, "qimerp-payroll-admin-sync", "Payroll"),
-        new(SyncType.AdminData, ModuleKeys.CoreAccounting, "qimerp-accounting-admin-sync", "Accounting"),
+        new(SyncType.AdminData, ModuleKeys.CoreAccounting, "qimerp-finance-admin-sync", "Accounting"),
         new(SyncType.AdminData, ModuleKeys.EmployeeEngagement, "qimerp-employeeengagement-admin-sync", "EmployeeEngagement"),
         new(SyncType.AdminData, ModuleKeys.Recruitment, "qimerp-recruitment-admin-sync", "Recruitment"),
         new(SyncType.AdminData, ModuleKeys.Surveys, "qimerp-surveys-admin-sync", "Surveys"),
@@ -264,21 +267,28 @@ public static class ModuleSyncRegistry
         new(SyncType.AdminData, ModuleKeys.Project, "qimerp-operations-project-admin-sync", "Project"),
 
         new(SyncType.GlReference, ModuleKeys.Project, "qimerp-operations-project-gl-sync", "Project"),
-        new(SyncType.GlReference, ModuleKeys.BudgetPlanning, "qimerp-accounting-budget-planning-gl-sync", "BudgetPlanning"),
-        new(SyncType.GlReference, ModuleKeys.CashManagement, "qimerp-accounting-cash-management-gl-sync", "CashManagement"),
+        new(SyncType.GlReference, ModuleKeys.BudgetPlanning, "qimerp-finance-budget-planning-gl-sync", "BudgetPlanning"),
+        new(SyncType.GlReference, ModuleKeys.CashManagement, "qimerp-finance-cash-management-gl-sync", "CashManagement"),
 
         new(SyncType.AssignmentChanged, ModuleKeys.Payroll, "qimerp-payroll-employee-sync", "Payroll"),
 
-        new(SyncType.JournalEntryPosted, ModuleKeys.BudgetPlanning, "qimerp-accounting-budget-planning-je-sync", "BudgetPlanning"),
+        new(SyncType.JournalEntryPosted, ModuleKeys.BudgetPlanning, "qimerp-finance-budget-planning-je-sync", "BudgetPlanning"),
 
         new(SyncType.TenantReference, ModuleKeys.CoreHR, "qimerp-corehr-tenant-reference-sync", "CoreHR"),
         new(SyncType.TenantReference, ModuleKeys.Payroll, "qimerp-payroll-tenant-reference-sync", "Payroll"),
         new(SyncType.TenantReference, ModuleKeys.Leave, "qimerp-leave-tenant-reference-sync", "Leave"),
-        new(SyncType.TenantReference, ModuleKeys.CoreAccounting, "qimerp-accounting-tenant-reference-sync", "Accounting"),
+        new(SyncType.TenantReference, ModuleKeys.CoreAccounting, "qimerp-finance-tenant-reference-sync", "Accounting"),
 
         new(SyncType.StockIssue, ModuleKeys.Inventory, "qimerp-inventory-stock-issue-sync", "Inventory"),
         new(SyncType.Customer, ModuleKeys.Inventory, "qimerp-inventory-customer-sync", "Inventory"),
         new(SyncType.Vendor, ModuleKeys.Inventory, "qimerp-inventory-vendor-sync", "Inventory"),
+
+        new(SyncType.PersonErasure, ModuleKeys.CoreHR, ModuleSyncWorkflowQueues.PersonErasureParent, "CoreHR"),
+        new(SyncType.PersonErasure, ModuleKeys.CashManagement, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
+        new(SyncType.PersonErasure, ModuleKeys.Workflow, "qimerp-platform-workflow-actor-sync", "Workflow"),
+        new(SyncType.PersonErasure, ModuleKeys.Leave, "qimerp-leave-employee-sync", "Leave"),
+        new(SyncType.PersonErasure, ModuleKeys.Payroll, "qimerp-payroll-employee-sync", "Payroll"),
+        new(SyncType.PersonErasure, null, "qimerp-platform-employee-sync", "IAM", RequiresModuleSelection: false),
     ];
 
     private static readonly Dictionary<string, ModuleSyncDefinition> ByItemKey =
