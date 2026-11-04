@@ -133,11 +133,16 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$NUGET_API_KEY"
-          # Push one package at a time. A single glob push aborts on the first 403
-          # (immutable / already-owned versions). --skip-duplicate only covers 409.
+          # Prefer new Temporal builds first. Pushing already-published IDs first can
+          # return 403 and obscure the packages we actually need to release.
+          shopt -s nullglob
+          ordered=(./nupkgs/QFace.Sdk.Temporal.*.nupkg ./nupkgs/*.nupkg)
+          seen=
           failed=0
-          for pkg in ./nupkgs/*.nupkg; do
+          for pkg in "${ordered[@]}"; do
             base=$(basename "$pkg")
+            case " $seen " in *" $base "*) continue ;; esac
+            seen+=" $base"
             echo "Pushing $base..."
             set +e
             out=$(dotnet nuget push "$pkg" \
