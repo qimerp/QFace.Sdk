@@ -80,8 +80,9 @@ public static class TemporalClientServiceCollectionExtensions
                 ? opts.ApiKey.Trim()
                 : Environment.GetEnvironmentVariable("TEMPORAL_API_KEY")?.Trim();
 
-            // Auto-enable TLS for non-local addresses or when API key is set (Temporal Cloud).
-            var useTls = opts.EnableTls || !string.IsNullOrEmpty(apiKey) || !TemporalNaming.IsLocalAddress(address);
+            // Explicit EnableTls wins. Otherwise auto for Temporal Cloud (API key / non-local).
+            var useTls = opts.EnableTls
+                ?? (!string.IsNullOrEmpty(apiKey) || !TemporalNaming.IsLocalAddress(address));
 
             logger.LogInformation(
                 "[QFace.Sdk.Temporal] Connecting. Address={Address}, Namespace={Namespace}, TLS={UseTls}, ApiKey={HasApiKey}",
@@ -94,7 +95,19 @@ public static class TemporalClientServiceCollectionExtensions
             };
 
             if (!string.IsNullOrEmpty(apiKey))
-                connectOptions.ApiKey = apiKey;
+            {
+                if (useTls)
+                {
+                    connectOptions.ApiKey = apiKey;
+                }
+                else
+                {
+                    connectOptions.RpcMetadata = new Dictionary<string, string>
+                    {
+                        ["authorization"] = $"Bearer {apiKey}"
+                    };
+                }
+            }
 
             if (useTls)
             {
