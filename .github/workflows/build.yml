@@ -119,22 +119,31 @@ jobs:
           echo "Created packages:"
           ls -la ./nupkgs/
 
-      - name: NuGet login (OIDC → temp API key)
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        id: nuget-login
-        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
-        with:
-          user: iamqwame
-
-      - name: Publish to NuGet
+      - name: Publish to NuGet (OIDC trusted publishing)
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
-          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_USER: iamqwame
+          NUGET_TOKEN_ENDPOINT: https://www.nuget.org/api/v2/token
+          NUGET_SOURCE: https://api.nuget.org/v3/index.json
         run: |
           set -euo pipefail
-          test -n "$NUGET_API_KEY"
-          # Prefer new Temporal builds first. Pushing already-published IDs first can
-          # return 403 and obscure the packages we actually need to release.
+          # Exchange GitHub OIDC → short-lived NuGet API key (same flow as NuGet/login).
+          # Mint a fresh key per package: one OIDC token yields one API key.
+          mint_nuget_key() {
+            local oidc response
+            oidc=$(curl -fsSL \
+              -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              -H "Accept: application/json; api-version=2.0" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fwww.nuget.org" \
+              | jq -r '.value')
+            response=$(curl -fsSL -X POST "$NUGET_TOKEN_ENDPOINT" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $oidc" \
+              -d "{\"username\":\"$NUGET_USER\",\"tokenType\":\"ApiKey\"}")
+            echo "$response" | jq -c 'del(.apiKey)' >&2
+            jq -er '.apiKey' <<<"$response"
+          }
+
           shopt -s nullglob
           ordered=(./nupkgs/QFace.Sdk.Temporal.*.nupkg ./nupkgs/*.nupkg)
           seen=
@@ -143,11 +152,15 @@ jobs:
             base=$(basename "$pkg")
             case " $seen " in *" $base "*) continue ;; esac
             seen+=" $base"
-            echo "Pushing $base..."
+
+            echo "Minting NuGet API key for $base..."
+            api_key=$(mint_nuget_key)
+            test -n "$api_key"
+            echo "Pushing $base (key length ${#api_key})..."
             set +e
             out=$(dotnet nuget push "$pkg" \
-              --api-key "$NUGET_API_KEY" \
-              --source https://api.nuget.org/v3/index.json \
+              --api-key "$api_key" \
+              --source "$NUGET_SOURCE" \
               --skip-duplicate 2>&1)
             code=$?
             set -e
