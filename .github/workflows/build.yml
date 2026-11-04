@@ -131,8 +131,35 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
+          set -euo pipefail
           test -n "$NUGET_API_KEY"
-          dotnet nuget push ./nupkgs/*.nupkg \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          # Push one package at a time. A single glob push aborts on the first 403
+          # (immutable / already-owned versions). --skip-duplicate only covers 409.
+          failed=0
+          for pkg in ./nupkgs/*.nupkg; do
+            base=$(basename "$pkg")
+            echo "Pushing $base..."
+            set +e
+            out=$(dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate 2>&1)
+            code=$?
+            set -e
+            echo "$out"
+            if [[ $code -eq 0 ]]; then
+              continue
+            fi
+            if [[ "$base" == QFace.Sdk.Temporal.* ]]; then
+              echo "Failed required package $base"
+              failed=1
+              continue
+            fi
+            if echo "$out" | grep -qiE 'already exists|Conflict|409|403'; then
+              echo "Skipping $base (duplicate or no overwrite permission)"
+              continue
+            fi
+            echo "Failed $base"
+            failed=1
+          done
+          exit "$failed"
