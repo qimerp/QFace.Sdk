@@ -20,6 +20,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, qimerp-ci]
     timeout-minutes: 45
+    env:
+      MSBUILDDISABLENODEREUSE: "1"
     concurrency:
       group: qimerp-ci-sdk-pr-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
@@ -65,9 +67,9 @@ jobs:
             fi
             echo "Building $project_name..."
             # Packages bumped together in one PR resolve from ./nupkgs; the readme is only staged by build.yml.
-            dotnet restore "$project" -s ./nupkgs -s https://api.nuget.org/v3/index.json || { failed=1; continue; }
-            dotnet build "$project" -c Release --no-restore -m:3 -nodeReuse:false -p:UseSharedCompilation=false || { failed=1; continue; }
-            dotnet pack "$project" -c Release --no-build -o ./nupkgs -p:PackageReadmeFile= || failed=1
+            dotnet restore "$project" -s ./nupkgs -s https://api.nuget.org/v3/index.json --disable-parallel -m:1 || { failed=1; continue; }
+            dotnet build "$project" -c Release --no-restore -m:1 -nodeReuse:false -p:UseSharedCompilation=false || { failed=1; continue; }
+            dotnet pack "$project" -c Release --no-build --no-restore -m:1 -nodeReuse:false -p:UseSharedCompilation=false -o ./nupkgs -p:PackageReadmeFile= || failed=1
           done
           exit $failed
 
@@ -81,7 +83,7 @@ jobs:
               echo "Skipping $project (Testcontainers)"
               continue
             fi
-            dotnet restore "$project" -s ./nupkgs -s https://api.nuget.org/v3/index.json
-            dotnet build "$project" -c Release --no-restore -m:3 -nodeReuse:false -p:UseSharedCompilation=false
+            dotnet restore "$project" -s ./nupkgs -s https://api.nuget.org/v3/index.json --disable-parallel -m:1
+            dotnet build "$project" -c Release --no-restore -m:1 -nodeReuse:false -p:UseSharedCompilation=false
             dotnet test "$project" -c Release --no-build
           done
