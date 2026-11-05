@@ -1,6 +1,9 @@
 name: PR Validation — QFace.Sdk
 
 on:
+  workflow_dispatch:
+  push:
+    branches: [development, main]
   pull_request:
     branches: [development, main]
     paths:
@@ -14,11 +17,11 @@ permissions:
 jobs:
   validate:
     name: Build & Test
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, qimerp-ci]
     timeout-minutes: 45
     concurrency:
-      group: qimerp-ci-sdk-pr-${{ github.event.pull_request.number }}
+      group: qimerp-ci-sdk-pr-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
 
     steps:
