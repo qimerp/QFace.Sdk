@@ -529,6 +529,7 @@ public static class SharedServiceCollectionExtensions
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<JwtSettings>>().Value);
         JwtSettings jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>() ?? throw new InvalidOperationException("JWT settings not found.");
+        var accessTokenAuthority = AccessTokenAuthority.Configure(services, configuration);
 
         // ✅ Configure Authentication (JWT Bearer)
         services
@@ -561,6 +562,7 @@ public static class SharedServiceCollectionExtensions
                 };
                 options.Events = new JwtBearerEvents
                 {
+                    OnTokenValidated = context => accessTokenAuthority?.ValidateAsync(context) ?? Task.CompletedTask,
                     OnAuthenticationFailed = context =>
                     {
                         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
