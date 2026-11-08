@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using QFace.Sdk.RedisCache.Models;
 
 namespace QFace.Sdk.RedisCache.Services.Providers;
@@ -7,11 +8,14 @@ namespace QFace.Sdk.RedisCache.Services.Providers;
 /// <summary>
 /// Upstash Redis provider implementation using HTTP/REST API
 /// </summary>
-public class UpstashRedisProvider : IRedisProvider
+public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
 {
     private readonly UpstashOptions _options;
     private readonly HttpClient _httpClient;
     private readonly ILogger<UpstashRedisProvider> _logger;
+
+    private const int ScanBatchSize = 500;
+    private const int MaxScanPages = 100000;
 
     public UpstashRedisProvider(
         UpstashOptions options,
@@ -39,6 +43,29 @@ public class UpstashRedisProvider : IRedisProvider
             return default(T);
 
         return Deserialize<T>(result!);
+    }
+
+    async Task<(bool Found, T Value)> IRedisValueProbe.TryGetAsync<T>(string key)
+    {
+        var result = await ExecuteCommandAsync<string>("GET", new[] { key });
+        if (result == null)
+            return (false, default!);
+
+        if (result.Length == 0)
+            return (true, default!);
+
+        if (typeof(T) == typeof(string))
+            return (true, (T)(object)result);
+
+        try
+        {
+            return (true, JsonConvert.DeserializeObject<T>(result, RedisJsonSettings.Settings)!);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Failed to deserialize cached value ({ExceptionType})", ex.GetType().Name);
+            return (false, default!);
+        }
     }
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
@@ -109,13 +136,33 @@ public class UpstashRedisProvider : IRedisProvider
         if (string.IsNullOrWhiteSpace(pattern))
             return 0;
 
-        var keys = await ExecuteCommandAsync<string[]>("KEYS", new[] { pattern });
-        if (keys == null || keys.Length == 0)
-        {
-            return 0;
-        }
+        var deleted = 0L;
+        var cursor = "0";
+        var pages = 0;
 
-        return await ExecuteCommandAsync<long>("DEL", keys);
+        do
+        {
+            if (++pages > MaxScanPages)
+            {
+                throw new InvalidOperationException("SCAN exceeded the maximum page count");
+            }
+
+            var page = await ExecuteCommandAsync<JArray>("SCAN", new[] { cursor, "MATCH", pattern, "COUNT", ScanBatchSize.ToString() });
+            if (page == null || page.Count < 2)
+            {
+                throw new InvalidOperationException("Unexpected SCAN response");
+            }
+
+            cursor = page[0].ToString();
+            var keys = page[1].Values<string>().Where(k => !string.IsNullOrEmpty(k)).ToArray();
+            foreach (var chunk in keys.Chunk(ScanBatchSize))
+            {
+                deleted += await ExecuteCommandAsync<long>("DEL", chunk!);
+            }
+        }
+        while (cursor != "0");
+
+        return deleted;
     }
 
     public async Task<bool> SetIfNotExistsAsync<T>(string key, T value, TimeSpan? expiration = null)
