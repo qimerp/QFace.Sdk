@@ -169,7 +169,7 @@ public class TenantModuleAccessServiceTests
     }
 
     private static TenantModuleAccessService CreateService(
-        IDistributedCacheService cache,
+        ISharedDistributedCacheService cache,
         IHttpContextAccessor? httpContextAccessor = null) =>
         new(cache, httpContextAccessor ?? new FakeHttpContextAccessor());
 }
@@ -179,7 +179,7 @@ internal sealed class FakeHttpContextAccessor : IHttpContextAccessor
     public HttpContext? HttpContext { get; set; }
 }
 
-internal sealed class CountingDistributedCacheService : IDistributedCacheService
+internal sealed class CountingDistributedCacheService : ISharedDistributedCacheService
 {
     private readonly InMemoryDistributedCacheService _inner = new();
     public int ReadCount { get; private set; }
@@ -221,7 +221,7 @@ internal sealed class CountingDistributedCacheService : IDistributedCacheService
         throw new NotSupportedException();
 }
 
-internal sealed class InMemoryDistributedCacheService : IDistributedCacheService
+internal sealed class InMemoryDistributedCacheService : ISharedDistributedCacheService
 {
     private readonly Dictionary<string, object> _store = new(StringComparer.Ordinal);
 

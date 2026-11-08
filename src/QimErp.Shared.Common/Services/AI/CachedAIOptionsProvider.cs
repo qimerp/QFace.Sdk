@@ -12,7 +12,7 @@ namespace QimErp.Shared.Common.Services.AI;
 /// IAIOptionsProvider resolution order: (1) the calling tenant's own provider config, if one
 /// has been saved via IAM's tenant AI-provider settings endpoint, (2) this host's local AI:*
 /// config, (3) the shared Redis fallback seeded by IAM's PlatformAIConfigSeedService.
-/// Registered as a singleton but resolves scoped services (IDistributedCacheService,
+/// Registered as a singleton but resolves scoped services (ISharedDistributedCacheService,
 /// ICurrentUserService) via a DI scope per call.
 /// </summary>
 public sealed class CachedAIOptionsProvider(
@@ -73,7 +73,7 @@ public sealed class CachedAIOptionsProvider(
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var cache = scope.ServiceProvider.GetRequiredService<IDistributedCacheService>();
+            var cache = scope.ServiceProvider.GetRequiredService<ISharedDistributedCacheService>();
             var entry = await cache.GetAsync<AIOptions>(SharedCacheKeys.TenantAIProviderConfig(tenantId));
 
             if (entry is not null)
@@ -102,7 +102,7 @@ public sealed class CachedAIOptionsProvider(
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var cache = scope.ServiceProvider.GetRequiredService<IDistributedCacheService>();
+            var cache = scope.ServiceProvider.GetRequiredService<ISharedDistributedCacheService>();
             var entry = await cache.GetAsync<AIOptions>(SharedCacheKeys.PlatformAIProviderConfig());
 
             if (entry is not null)
