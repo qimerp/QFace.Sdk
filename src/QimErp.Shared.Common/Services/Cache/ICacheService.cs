@@ -19,3 +19,9 @@ public interface IDistributedCacheService : ICacheService
     Task<bool> ExistsAsync(string key, string? region = null);
     Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null, string? region = null);
 }
+
+/// <summary>
+/// Cache for keys written by one service and read by another (<see cref="Constants.SharedCacheKeys"/>,
+/// <see cref="Workflow.WorkflowDefinitionCacheKeys"/>). Never applies the service's RedisCache:KeyPrefix.
+/// </summary>
+public interface ISharedDistributedCacheService : IDistributedCacheService;

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace QFace.Sdk.RedisCache.Services;
 
 /// <summary>
@@ -7,15 +9,37 @@ public class RedisCacheService : IRedisCacheService
 {
     private readonly Providers.IRedisProvider _provider;
     private readonly Models.RedisCacheOptions _options;
+    private readonly ILogger _logger;
+    private readonly string _keyPrefix;
+
+    private static readonly ConcurrentDictionary<FlightKey, Task> Flights = new();
+
+    private readonly record struct FlightKey(Providers.IRedisProvider Provider, string Key, Type Type);
+
+    private static readonly TimeSpan FlightWaitTimeout = TimeSpan.FromSeconds(30);
+
+    private sealed record Snapshot(bool Available, string? Payload);
+
+    private static readonly char[] GlobChars = { '*', '?', '[', '\\' };
 
     public RedisCacheService(
         Providers.IRedisProvider provider,
         IOptions<Models.RedisCacheOptions> options,
         ILogger<RedisCacheService> logger)
+        : this(provider, options, logger, keyPrefix: null)
+    {
+    }
+
+    protected RedisCacheService(
+        Providers.IRedisProvider provider,
+        IOptions<Models.RedisCacheOptions> options,
+        ILogger logger,
+        string? keyPrefix)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _ = logger ?? throw new ArgumentNullException(nameof(logger));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _keyPrefix = keyPrefix ?? _options.KeyPrefix;
     }
 
     public async Task<T> GetAsync<T>(string key)
@@ -67,7 +91,17 @@ public class RedisCacheService : IRedisCacheService
 
     public async Task<long> RemoveByPatternAsync(string pattern)
     {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            return 0;
+        }
+
         var fullPattern = GetFullKey(pattern);
+        if (fullPattern.IndexOfAny(GlobChars) < 0)
+        {
+            return await _provider.RemoveAsync(fullPattern) ? 1 : 0;
+        }
+
         return await _provider.RemoveByPatternAsync(fullPattern);
     }
 
@@ -81,26 +115,148 @@ public class RedisCacheService : IRedisCacheService
     public async Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null)
     {
         var fullKey = GetFullKey(key);
-        var cached = await _provider.GetAsync<T>(fullKey);
+        var readFailed = false;
 
+        try
+        {
+            var (found, cached) = await TryReadAsync<T>(fullKey);
+            if (found)
+            {
+                return cached;
+            }
+        }
+        catch (Exception ex)
+        {
+            readFailed = true;
+            _logger.LogWarning(ex, "Cache read failed; loading from origin");
+        }
+
+        var flightKey = new FlightKey(_provider, fullKey, typeof(T));
+        var tcs = new TaskCompletionSource<Snapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var existing = Flights.GetOrAdd(flightKey, tcs.Task);
+
+        if (!ReferenceEquals(existing, tcs.Task))
+        {
+            try
+            {
+                var shared = await ((Task<Snapshot>)existing).WaitAsync(FlightWaitTimeout);
+                if (shared.Available)
+                {
+                    return FromSnapshot<T>(shared);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("Shared cache load unavailable ({ExceptionType}); loading from origin independently", ex.GetType().Name);
+            }
+
+            var independent = await factory();
+            if (!readFailed)
+            {
+                await TryStoreAsync(fullKey, independent, expiration);
+            }
+
+            return independent;
+        }
+
+        T value;
+        try
+        {
+            value = await factory();
+        }
+        catch (Exception ex)
+        {
+            Flights.TryRemove(new KeyValuePair<FlightKey, Task>(flightKey, tcs.Task));
+            tcs.TrySetException(ex);
+            _ = tcs.Task.Exception;
+            throw;
+        }
+
+        try
+        {
+            tcs.TrySetResult(CreateSnapshot(value));
+            if (!readFailed)
+            {
+                await TryStoreAsync(fullKey, value, expiration);
+            }
+
+            return value;
+        }
+        finally
+        {
+            Flights.TryRemove(new KeyValuePair<FlightKey, Task>(flightKey, tcs.Task));
+        }
+    }
+
+    private async Task<(bool Found, T Value)> TryReadAsync<T>(string fullKey)
+    {
+        if (_provider is Providers.IRedisValueProbe probe)
+        {
+            return await probe.TryGetAsync<T>(fullKey);
+        }
+
+        var cached = await _provider.GetAsync<T>(fullKey);
         if (!EqualityComparer<T>.Default.Equals(cached, default!))
         {
-            return cached;
+            return (true, cached);
         }
 
-        if (await _provider.ExistsAsync(fullKey))
+        return (await _provider.ExistsAsync(fullKey), cached);
+    }
+
+    private async Task TryStoreAsync<T>(string fullKey, T value, TimeSpan? expiration)
+    {
+        if (EqualityComparer<T>.Default.Equals(value, default!))
         {
-            return cached;
+            return;
         }
 
-        var value = await factory();
-        if (!EqualityComparer<T>.Default.Equals(value, default!))
+        try
         {
-            var expiry = expiration ?? _options.DefaultExpiration;
-            await _provider.SetAsync(fullKey, value, expiry);
+            await _provider.SetAsync(fullKey, value, expiration ?? _options.DefaultExpiration);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache write failed after origin load");
+        }
+    }
+
+    private Snapshot CreateSnapshot<T>(T value)
+    {
+        if (EqualityComparer<T>.Default.Equals(value, default!))
+        {
+            return new Snapshot(true, null);
         }
 
-        return value;
+        if (value is string str)
+        {
+            return new Snapshot(true, str);
+        }
+
+        try
+        {
+            return new Snapshot(true, JsonConvert.SerializeObject(value, Providers.RedisJsonSettings.Settings));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Cache snapshot failed ({ExceptionType}); waiters will load independently", ex.GetType().Name);
+            return new Snapshot(false, null);
+        }
+    }
+
+    private static T FromSnapshot<T>(Snapshot snapshot)
+    {
+        if (snapshot.Payload is null)
+        {
+            return default!;
+        }
+
+        if (typeof(T) == typeof(string))
+        {
+            return (T)(object)snapshot.Payload;
+        }
+
+        return JsonConvert.DeserializeObject<T>(snapshot.Payload, Providers.RedisJsonSettings.Settings)!;
     }
 
     public async Task<TimeSpan?> GetTimeToLiveAsync(string key)
@@ -171,10 +327,9 @@ public class RedisCacheService : IRedisCacheService
 
     private string GetFullKey(string key)
     {
-        if (string.IsNullOrEmpty(_options.KeyPrefix))
+        if (string.IsNullOrEmpty(_keyPrefix))
             return key;
 
-        return $"{_options.KeyPrefix}{key}";
+        return $"{_keyPrefix}{key}";
     }
 }
-

@@ -90,6 +90,38 @@ public abstract class AppSettingsService<TContext> : IAppSettingsService
         }
     }
 
+    public async Task<T?> ReadCommittedSettingAsync<T>(string key, T? defaultValue = default)
+    {
+        var cacheKey = CacheKey(key);
+
+        if (_cache.TryGetValue(cacheKey, out T? cachedValue))
+        {
+            return cachedValue;
+        }
+
+        if (!CanConnectForCommittedRead())
+        {
+            _logger.LogError("Database is not available; cannot read committed setting {Key}", key);
+            throw new InvalidOperationException(
+                $"Database is not available; cannot read committed setting '{key}'.");
+        }
+
+        var companyId = EffectiveCompanyId;
+        var setting = Resolve(await Candidates(companyId).Where(s => s.Key == key).ToListAsync(), companyId);
+
+        if (setting == null)
+        {
+            return defaultValue;
+        }
+
+        var value = setting.GetValue<T>();
+        _cache.Set(cacheKey, value, TimeSpan.FromMinutes(CacheExpirationMinutes));
+
+        return value ?? defaultValue;
+    }
+
+    protected virtual bool CanConnectForCommittedRead() => _context.Database.CanConnect();
+
     public async Task<string?> GetStringSettingAsync(string key, string? defaultValue = null)
     {
         return await GetSettingAsync(key, defaultValue);
