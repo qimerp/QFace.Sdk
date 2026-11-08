@@ -77,7 +77,7 @@ public class TenantPluginAccessServiceTests
     }
 
     private static TenantPluginAccessService CreateService(
-        IDistributedCacheService cache,
+        ISharedDistributedCacheService cache,
         IHttpContextAccessor? httpContextAccessor = null) =>
         new(cache, httpContextAccessor ?? new PluginFakeHttpContextAccessor());
 }
@@ -87,7 +87,7 @@ internal sealed class PluginFakeHttpContextAccessor : IHttpContextAccessor
     public HttpContext? HttpContext { get; set; }
 }
 
-internal sealed class PluginCountingDistributedCacheService : IDistributedCacheService
+internal sealed class PluginCountingDistributedCacheService : ISharedDistributedCacheService
 {
     private readonly InMemoryDistributedCacheService _inner = new();
     public int ReadCount { get; private set; }

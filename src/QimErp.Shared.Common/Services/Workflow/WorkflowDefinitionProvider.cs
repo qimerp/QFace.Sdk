@@ -7,7 +7,7 @@ namespace QimErp.Shared.Common.Services.Workflow;
 /// a cache miss means no published workflow exists for that tenant/entity.
 /// </summary>
 public class WorkflowDefinitionProvider(
-    IDistributedCacheService cache,
+    ISharedDistributedCacheService cache,
     ILogger<WorkflowDefinitionProvider> logger) : IWorkflowDefinitionProvider
 {
     public async Task<PublishedWorkflowDefinition?> GetPublishedDefinitionAsync(

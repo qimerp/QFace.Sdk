@@ -7,15 +7,26 @@ public class RedisCacheService : IRedisCacheService
 {
     private readonly Providers.IRedisProvider _provider;
     private readonly Models.RedisCacheOptions _options;
+    private readonly string _keyPrefix;
 
     public RedisCacheService(
         Providers.IRedisProvider provider,
         IOptions<Models.RedisCacheOptions> options,
         ILogger<RedisCacheService> logger)
+        : this(provider, options, logger, keyPrefix: null)
+    {
+    }
+
+    protected RedisCacheService(
+        Providers.IRedisProvider provider,
+        IOptions<Models.RedisCacheOptions> options,
+        ILogger logger,
+        string? keyPrefix)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _ = logger ?? throw new ArgumentNullException(nameof(logger));
+        _keyPrefix = keyPrefix ?? _options.KeyPrefix;
     }
 
     public async Task<T> GetAsync<T>(string key)
@@ -171,10 +182,10 @@ public class RedisCacheService : IRedisCacheService
 
     private string GetFullKey(string key)
     {
-        if (string.IsNullOrEmpty(_options.KeyPrefix))
+        if (string.IsNullOrEmpty(_keyPrefix))
             return key;
 
-        return $"{_options.KeyPrefix}{key}";
+        return $"{_keyPrefix}{key}";
     }
 }
 

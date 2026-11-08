@@ -3,7 +3,7 @@ using QimErp.Shared.Common.Services.Cache;
 namespace QimErp.Shared.Common.Services.Workflow;
 
 public class WorkflowDefinitionCacheWriter(
-    IDistributedCacheService cache,
+    ISharedDistributedCacheService cache,
     ILogger<WorkflowDefinitionCacheWriter> logger) : IWorkflowDefinitionCacheWriter
 {
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(1440);

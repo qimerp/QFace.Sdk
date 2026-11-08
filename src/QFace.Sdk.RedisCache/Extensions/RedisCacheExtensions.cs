@@ -29,6 +29,7 @@ public static class RedisCacheExtensions
         
         // Register main service
         services.AddScoped<IRedisCacheService, RedisCacheService>();
+        services.AddScoped<IGlobalRedisCacheService, GlobalRedisCacheService>();
         
         return services;
     }
