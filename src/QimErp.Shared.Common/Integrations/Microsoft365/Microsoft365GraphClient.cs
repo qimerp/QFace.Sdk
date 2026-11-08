@@ -10,7 +10,7 @@ using QimErp.Shared.Common.Services.Cache;
 namespace QimErp.Shared.Common.Integrations.Microsoft365;
 
 public sealed class Microsoft365GraphClient(
-    ICacheService cache,
+    ISharedDistributedCacheService cache,
     IHttpClientFactory httpClientFactory,
     ILogger<Microsoft365GraphClient> logger) : IMicrosoft365GraphClient
 {

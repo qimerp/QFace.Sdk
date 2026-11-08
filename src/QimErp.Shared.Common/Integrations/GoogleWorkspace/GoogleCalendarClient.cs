@@ -12,7 +12,7 @@ using QimErp.Shared.Common.Services.Cache;
 namespace QimErp.Shared.Common.Integrations.GoogleWorkspace;
 
 public sealed class GoogleCalendarClient(
-    ICacheService cache,
+    ISharedDistributedCacheService cache,
     IHttpClientFactory httpClientFactory,
     ILogger<GoogleCalendarClient> logger) : IGoogleCalendarClient
 {
