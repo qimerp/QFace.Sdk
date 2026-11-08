@@ -1,6 +1,6 @@
 # Redis: shared (cross-service) keys vs `RedisCache:KeyPrefix`
 
-QFace.Sdk.RedisCache 1.0.4 · QimErp.Shared.Common 3.11.49 · 2026-11-08
+QFace.Sdk.RedisCache 1.0.5 · QimErp.Shared.Common 3.11.49 · 2026-11-08
 
 ## Problem
 
@@ -44,7 +44,7 @@ style purge would also start deleting Platform's keys.
 Whether a key is shared is decided **at the call site, by the service type it injects**.
 It is not inferred from the key string. Physical key strings do not change.
 
-**QFace.Sdk.RedisCache 1.0.4**
+**QFace.Sdk.RedisCache 1.0.5**
 
 - New `IGlobalRedisCacheService : IRedisCacheService` (no new members). Its implementation,
   `GlobalRedisCacheService`, uses keys and patterns verbatim and never applies `KeyPrefix`.
@@ -98,8 +98,8 @@ Rejected alternatives:
 - Hosts that register `TenantModuleAccessService` by hand, without `AddSharedServices`, must also
   register `ISharedDistributedCacheService` → `SharedRedisCacheService`. Today that is
   Core.Reporting `ReportingModuleAccessRegistration`.
-- Shared.Common 3.11.49 depends on QFace.Sdk.RedisCache 1.0.4. Consumers that pin
-  `QFace.Sdk.RedisCache` in `Directory.Packages.props` must raise it to 1.0.4 together with
+- Shared.Common 3.11.49 depends on QFace.Sdk.RedisCache 1.0.5. Consumers that pin
+  `QFace.Sdk.RedisCache` in `Directory.Packages.props` must raise it to 1.0.5 together with
   Shared.Common, and both nupkgs must be in their `local-nuget/`.
 
 ## Consumer follow-ups (service repos)
