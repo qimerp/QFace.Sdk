@@ -42,7 +42,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         if (string.IsNullOrEmpty(result))
             return default(T);
 
-        return Deserialize<T>(result!);
+        return Deserialize<T>(key, result!);
     }
 
     async Task<(bool Found, T Value)> IRedisValueProbe.TryGetAsync<T>(string key)
@@ -63,7 +63,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Failed to deserialize cached value ({ExceptionType})", ex.GetType().Name);
+            _logger.LogWarning("Failed to deserialize cached value for key {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
             return (false, default!);
         }
     }
@@ -106,7 +106,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         {
             if (result != null && i < result.Length && !string.IsNullOrEmpty(result[i]))
             {
-                dictionary[keys[i]] = Deserialize<T>(result[i]);
+                dictionary[keys[i]] = Deserialize<T>(keys[i], result[i]);
             }
         }
 
@@ -201,7 +201,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         if (string.IsNullOrEmpty(result))
             return default(T);
 
-        return Deserialize<T>(result);
+        return Deserialize<T>(key, result);
     }
 
     public async Task<bool> HashSetAsync<T>(string key, string field, T value)
@@ -222,7 +222,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         {
             if (i + 1 < result.Length)
             {
-                dictionary[result[i]] = Deserialize<T>(result[i + 1]);
+                dictionary[result[i]] = Deserialize<T>(key, result[i + 1]);
             }
         }
 
@@ -241,7 +241,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         if (string.IsNullOrEmpty(result))
             return default(T);
 
-        return Deserialize<T>(result);
+        return Deserialize<T>(key, result);
     }
 
     public async Task<List<T>> ListGetRangeAsync<T>(string key, long start, long stop)
@@ -250,7 +250,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         if (result == null || result.Length == 0)
             return new List<T>();
 
-        return result.Select(Deserialize<T>).ToList();
+        return result.Select(item => Deserialize<T>(key, item)).ToList();
     }
 
     public async Task<bool> SetAddAsync<T>(string key, T value)
@@ -273,7 +273,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         if (result == null || result.Length == 0)
             return new List<T>();
 
-        return result.Select(Deserialize<T>).ToList();
+        return result.Select(item => Deserialize<T>(key, item)).ToList();
     }
 
     private async Task<TResult> ExecuteCommandAsync<TResult>(string command, string[] args)
@@ -341,7 +341,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogError(ex, "Failed to deserialize Upstash response for command {Command}", command);
+                    _logger.LogError("Failed to deserialize Upstash response for command {Command} ({ExceptionType})", command, ex.GetType().Name);
                     throw;
                 }
 
@@ -355,17 +355,17 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
                 if (attempt <= _options.RetryCount)
                 {
                     var delay = (int)(_options.RetryBaseDelayMs * Math.Pow(2, attempt - 1));
-                    _logger.LogWarning(ex,
-                        "Upstash Redis command failed (attempt {Attempt}/{MaxRetries}): {Command}. Retrying in {Delay}ms...",
-                        attempt, _options.RetryCount + 1, command, delay);
+                    _logger.LogWarning(
+                        "Upstash Redis command failed (attempt {Attempt}/{MaxRetries}): {Command} ({ExceptionType}). Retrying in {Delay}ms...",
+                        attempt, _options.RetryCount + 1, command, ex.GetType().Name, delay);
 
                     await Task.Delay(delay);
                 }
             }
         }
 
-        _logger.LogError(lastException, "Upstash Redis command failed after {Retries} attempts: {Command}",
-            _options.RetryCount + 1, command);
+        _logger.LogError("Upstash Redis command failed after {Retries} attempts: {Command} ({ExceptionType})",
+            _options.RetryCount + 1, command, lastException?.GetType().Name);
         throw new InvalidOperationException($"Failed to execute Redis command '{command}' after {_options.RetryCount + 1} attempts", lastException);
     }
 
@@ -380,7 +380,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         return JsonConvert.SerializeObject(value, RedisJsonSettings.Settings);
     }
 
-    private T Deserialize<T>(string value)
+    private T Deserialize<T>(string key, string value)
     {
         if (string.IsNullOrEmpty(value))
             return default(T);
@@ -394,7 +394,7 @@ public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialize Redis value of type {Type}", typeof(T).Name);
+            _logger.LogError("Failed to deserialize Redis value for key {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
             return default(T);
         }
     }
