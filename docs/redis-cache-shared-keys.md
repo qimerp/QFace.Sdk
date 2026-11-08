@@ -1,6 +1,6 @@
 # Redis: shared (cross-service) keys vs `RedisCache:KeyPrefix`
 
-QFace.Sdk.RedisCache 1.0.3 · QimErp.Shared.Common 3.11.47 · 2026-11-08
+QFace.Sdk.RedisCache 1.0.4 · QimErp.Shared.Common 3.11.48 · 2026-11-08
 
 ## Problem
 
@@ -44,14 +44,14 @@ style purge would also start deleting Platform's keys.
 Whether a key is shared is decided **at the call site, by the service type it injects**.
 It is not inferred from the key string. Physical key strings do not change.
 
-**QFace.Sdk.RedisCache 1.0.3**
+**QFace.Sdk.RedisCache 1.0.4**
 
 - New `IGlobalRedisCacheService : IRedisCacheService` (no new members). Its implementation,
   `GlobalRedisCacheService`, uses keys and patterns verbatim and never applies `KeyPrefix`.
 - `AddRedisCache` registers it next to `IRedisCacheService` (scoped, same provider
   singleton). `IRedisCacheService` behaviour is unchanged.
 
-**QimErp.Shared.Common 3.11.47**
+**QimErp.Shared.Common 3.11.48**
 
 - New `ISharedDistributedCacheService : IDistributedCacheService` (no new members), backed by
   `SharedRedisCacheService` over `IGlobalRedisCacheService`. It is registered in the same place as
@@ -81,7 +81,7 @@ Rejected alternatives:
   Platform bump changes nothing at runtime. Services without a prefix (Payroll, Learning,
   Performance, Operations, Operator, Reporting) see no runtime change either.
 - **CoreHR and Finance** start reading Platform's real shared keys as soon as they run on
-  3.11.47. After deploying, remove the Contabo env override `RedisCache__KeyPrefix=` from
+  3.11.48. After deploying, remove the Contabo env override `RedisCache__KeyPrefix=` from
   CoreHR so its private keys return to `corehr:`. The CoreHR private cache starts cold once,
   which is harmless.
 - CoreHR workflow seeders (`WorkflowDefinitionCacheWriter`) previously wrote definitions under
@@ -98,8 +98,8 @@ Rejected alternatives:
 - Hosts that register `TenantModuleAccessService` by hand, without `AddSharedServices`, must also
   register `ISharedDistributedCacheService` → `SharedRedisCacheService`. Today that is
   Core.Reporting `ReportingModuleAccessRegistration`.
-- Shared.Common 3.11.47 depends on QFace.Sdk.RedisCache 1.0.3. Consumers that pin
-  `QFace.Sdk.RedisCache` in `Directory.Packages.props` must raise it to 1.0.3 together with
+- Shared.Common 3.11.48 depends on QFace.Sdk.RedisCache 1.0.4. Consumers that pin
+  `QFace.Sdk.RedisCache` in `Directory.Packages.props` must raise it to 1.0.4 together with
   Shared.Common, and both nupkgs must be in their `local-nuget/`.
 
 ## Consumer follow-ups (service repos)
