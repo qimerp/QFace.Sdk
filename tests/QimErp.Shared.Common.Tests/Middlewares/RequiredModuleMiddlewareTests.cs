@@ -236,10 +236,10 @@ public class RequiredModuleMiddlewareTests
 
     private const string SnapshotTenantId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 
-    private static TenantModuleAccessService CreateRealAccessService(IDistributedCacheService? cache = null) =>
+    private static TenantModuleAccessService CreateRealAccessService(ISharedDistributedCacheService? cache = null) =>
         new(cache ?? new InMemoryDistributedCacheService(), new FakeHttpContextAccessor());
 
-    private static async Task<IDistributedCacheService> CreateCacheWithModulesAsync(params string[] moduleKeys)
+    private static async Task<ISharedDistributedCacheService> CreateCacheWithModulesAsync(params string[] moduleKeys)
     {
         var cache = new InMemoryDistributedCacheService();
         await cache.SetAsync(

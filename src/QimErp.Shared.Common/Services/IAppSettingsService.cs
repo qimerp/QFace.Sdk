@@ -3,6 +3,10 @@ namespace QimErp.Shared.Common.Services;
 public interface IAppSettingsService
 {
     Task<T?> GetSettingAsync<T>(string key, T? defaultValue = default);
+
+    // Fail-closed when the database is unavailable — throws instead of returning defaultValue.
+    Task<T?> ReadCommittedSettingAsync<T>(string key, T? defaultValue = default);
+
     Task<string?> GetStringSettingAsync(string key, string? defaultValue = null);
     Task<string[]?> GetArraySettingAsync(string key, string[]? defaultValue = null);
     Task<Dictionary<string, object>?> GetObjectSettingAsync(string key, Dictionary<string, object>? defaultValue = null);

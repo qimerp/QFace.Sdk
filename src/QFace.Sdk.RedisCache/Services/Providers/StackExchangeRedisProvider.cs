@@ -303,7 +303,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialize value: {Value}", stringValue);
+            _logger.LogError(ex, "Failed to deserialize Redis value of type {Type}", typeof(T).Name);
             return default(T);
         }
     }
