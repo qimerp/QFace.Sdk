@@ -174,17 +174,36 @@ public class RedisCacheService(
             return await factory();
         }
 
+        var loaded = false;
+        var faulted = false;
+        T? value = default;
+
+        async Task<T> TrackedFactory()
+        {
+            try
+            {
+                var result = await factory();
+                value = result;
+                loaded = true;
+                return result;
+            }
+            catch
+            {
+                faulted = true;
+                throw;
+            }
+        }
+
         try
         {
             var fullKey = GetFullKey(key, region);
-            // SDK's GetOrSetAsync handles null values correctly
-            var ttl = expiration ?? TimeSpan.FromMinutes(15); // Default 15 minutes
-            return await redisCacheService.GetOrSetAsync(fullKey, factory, ttl);
+            var ttl = expiration ?? TimeSpan.FromMinutes(15);
+            return await redisCacheService.GetOrSetAsync(fullKey, TrackedFactory, ttl);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!faulted)
         {
             logger.LogError(ex, "Error in GetOrSetAsync for key: {Key}, calling factory directly", key);
-            return await factory();
+            return loaded ? value! : await factory();
         }
     }
 
