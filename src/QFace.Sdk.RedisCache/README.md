@@ -203,7 +203,7 @@ var tags = await _cache.SetGetAllAsync<string>("tags:post:123");
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `Provider` | `RedisProvider` | `StackExchange` | Provider type: `Upstash` or `StackExchange` |
-| `KeyPrefix` | `string` | `""` | Prefix for all cache keys |
+| `KeyPrefix` | `string` | `""` | Prefix for keys used through `IRedisCacheService`. `IGlobalRedisCacheService` (keys shared across services) never applies it. |
 | `DefaultExpiration` | `TimeSpan` | `30 minutes` | Default TTL for cached items |
 | `ConnectionTimeout` | `int` | `30000` | Connection timeout in milliseconds |
 

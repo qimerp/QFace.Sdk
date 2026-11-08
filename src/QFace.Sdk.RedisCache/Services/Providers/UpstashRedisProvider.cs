@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using QFace.Sdk.RedisCache.Models;
 
 namespace QFace.Sdk.RedisCache.Services.Providers;
@@ -7,11 +8,14 @@ namespace QFace.Sdk.RedisCache.Services.Providers;
 /// <summary>
 /// Upstash Redis provider implementation using HTTP/REST API
 /// </summary>
-public class UpstashRedisProvider : IRedisProvider
+public class UpstashRedisProvider : IRedisProvider, IRedisValueProbe
 {
     private readonly UpstashOptions _options;
     private readonly HttpClient _httpClient;
     private readonly ILogger<UpstashRedisProvider> _logger;
+
+    private const int ScanBatchSize = 500;
+    private const int MaxScanPages = 100000;
 
     public UpstashRedisProvider(
         UpstashOptions options,
@@ -39,6 +43,29 @@ public class UpstashRedisProvider : IRedisProvider
             return default(T);
 
         return Deserialize<T>(result!);
+    }
+
+    async Task<(bool Found, T Value)> IRedisValueProbe.TryGetAsync<T>(string key)
+    {
+        var result = await ExecuteCommandAsync<string>("GET", new[] { key });
+        if (result == null)
+            return (false, default!);
+
+        if (result.Length == 0)
+            return (true, default!);
+
+        if (typeof(T) == typeof(string))
+            return (true, (T)(object)result);
+
+        try
+        {
+            return (true, JsonConvert.DeserializeObject<T>(result, RedisJsonSettings.Settings)!);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Failed to deserialize cached value ({ExceptionType})", ex.GetType().Name);
+            return (false, default!);
+        }
     }
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
@@ -109,13 +136,33 @@ public class UpstashRedisProvider : IRedisProvider
         if (string.IsNullOrWhiteSpace(pattern))
             return 0;
 
-        var keys = await ExecuteCommandAsync<string[]>("KEYS", new[] { pattern });
-        if (keys == null || keys.Length == 0)
-        {
-            return 0;
-        }
+        var deleted = 0L;
+        var cursor = "0";
+        var pages = 0;
 
-        return await ExecuteCommandAsync<long>("DEL", keys);
+        do
+        {
+            if (++pages > MaxScanPages)
+            {
+                throw new InvalidOperationException("SCAN exceeded the maximum page count");
+            }
+
+            var page = await ExecuteCommandAsync<JArray>("SCAN", new[] { cursor, "MATCH", pattern, "COUNT", ScanBatchSize.ToString() });
+            if (page == null || page.Count < 2)
+            {
+                throw new InvalidOperationException("Unexpected SCAN response");
+            }
+
+            cursor = page[0].ToString();
+            var keys = page[1].Values<string>().Where(k => !string.IsNullOrEmpty(k)).ToArray();
+            foreach (var chunk in keys.Chunk(ScanBatchSize))
+            {
+                deleted += await ExecuteCommandAsync<long>("DEL", chunk!);
+            }
+        }
+        while (cursor != "0");
+
+        return deleted;
     }
 
     public async Task<bool> SetIfNotExistsAsync<T>(string key, T value, TimeSpan? expiration = null)
@@ -248,7 +295,7 @@ public class UpstashRedisProvider : IRedisProvider
                 var json = JsonConvert.SerializeObject(commandArray);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                _logger.LogDebug("Upstash Redis request: {Command} with args: {Args}", command, string.Join(", ", args ?? Array.Empty<string>()));
+                _logger.LogDebug("Upstash Redis request: {Command}", command);
 
                 var response = await _httpClient.PostAsync("", content);
 
@@ -256,34 +303,29 @@ public class UpstashRedisProvider : IRedisProvider
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("Upstash Redis API error: Status {StatusCode}, Response: {Response}",
-                        response.StatusCode, responseJson);
-                    throw new HttpRequestException($"Upstash Redis API returned {response.StatusCode}: {responseJson}");
+                    _logger.LogError("Upstash Redis API error: Status {StatusCode}, Command {Command}",
+                        response.StatusCode, command);
+                    throw new HttpRequestException($"Upstash Redis API returned {response.StatusCode}");
                 }
 
-                // Upstash REST API always returns JSON with either "result" or "error" field
-                // Format: { "result": <value> } or { "error": "<error message>" }
                 try
                 {
                     var responseObj = JsonConvert.DeserializeObject<UpstashResponse<TResult>>(responseJson);
 
                     if (responseObj == null)
                     {
-                        _logger.LogWarning("Upstash returned null response: {Response}", responseJson);
+                        _logger.LogWarning("Upstash returned null response for command {Command}", command);
                         return default(TResult);
                     }
 
-                    // Check for error response
                     if (responseObj.error != null)
                     {
-                        _logger.LogError("Upstash Redis API error: {Error}", responseObj.error);
-                        throw new InvalidOperationException($"Upstash Redis API error: {responseObj.error}");
+                        _logger.LogError("Upstash Redis API error for command {Command}", command);
+                        throw new InvalidOperationException($"Upstash Redis API error for command '{command}'");
                     }
 
-                    // Return the result
                     if (!EqualityComparer<TResult>.Default.Equals(responseObj.result!, default!))
                     {
-                        // For value types, check if it's the default value
                         if (typeof(TResult).IsValueType)
                         {
                             if (!EqualityComparer<TResult>.Default.Equals(responseObj.result, default(TResult)))
@@ -293,14 +335,13 @@ public class UpstashRedisProvider : IRedisProvider
                         }
                         else
                         {
-                            // For reference types, check for null
                             return responseObj.result;
                         }
                     }
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogError(ex, "Failed to deserialize Upstash response: {Response}", responseJson);
+                    _logger.LogError(ex, "Failed to deserialize Upstash response for command {Command}", command);
                     throw;
                 }
 
@@ -353,7 +394,7 @@ public class UpstashRedisProvider : IRedisProvider
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialize value: {Value}", value);
+            _logger.LogError(ex, "Failed to deserialize Redis value of type {Type}", typeof(T).Name);
             return default(T);
         }
     }

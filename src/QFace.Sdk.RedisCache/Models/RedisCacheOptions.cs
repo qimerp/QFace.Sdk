@@ -11,7 +11,7 @@ public class RedisCacheOptions
     public RedisProvider Provider { get; set; } = RedisProvider.StackExchange;
     
     /// <summary>
-    /// Optional prefix for all cache keys
+    /// Prefix applied by <see cref="Services.IRedisCacheService"/>; <see cref="Services.IGlobalRedisCacheService"/> ignores it
     /// </summary>
     public string KeyPrefix { get; set; } = "";
     

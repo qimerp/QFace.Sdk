@@ -11,13 +11,13 @@ namespace QimErp.Shared.Common.Services.Workflow;
 /// </summary>
 public class WorkflowConfigCacheService : IWorkflowConfigCacheService
 {
-    private readonly IDistributedCacheService _cache;
+    private readonly ISharedDistributedCacheService _cache;
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<WorkflowConfigCacheService> _logger;
     private readonly ConcurrentDictionary<string, EntityWorkflowConfig?> _localCache = new();
 
     public WorkflowConfigCacheService(
-        IDistributedCacheService cache,
+        ISharedDistributedCacheService cache,
         ITenantContext tenantContext,
         ILogger<WorkflowConfigCacheService> logger)
     {
