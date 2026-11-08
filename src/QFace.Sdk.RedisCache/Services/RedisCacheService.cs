@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace QFace.Sdk.RedisCache.Services;
 
@@ -11,10 +12,157 @@ public class RedisCacheService : IRedisCacheService
     private readonly Models.RedisCacheOptions _options;
     private readonly ILogger _logger;
     private readonly string _keyPrefix;
+    private readonly FillFence _fillFence;
 
     private static readonly ConcurrentDictionary<FlightKey, Task> Flights = new();
 
-    private readonly record struct FlightKey(Providers.IRedisProvider Provider, string Key, Type Type);
+    private static readonly ConditionalWeakTable<Providers.IRedisProvider, FillFence> FillFences = new();
+
+    private readonly record struct FlightKey(KeyFills Key, Type Type, long KeyGeneration, long WildcardGeneration);
+
+    private sealed class KeyFills
+    {
+        public long Generation;
+        public int Readers;
+        public int Invalidations;
+        public HashSet<Task> PendingStores { get; } = new();
+    }
+
+    private sealed class FillFence
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, KeyFills> _keys = new(StringComparer.Ordinal);
+        private long _wildcardGeneration;
+        private int _wildcardInvalidations;
+
+        public readonly record struct Fill(FillFence Fence, string Key, KeyFills State, long KeyGeneration, long WildcardGeneration) : IDisposable
+        {
+            public FlightKey FlightKey(Type type) => new(State, type, KeyGeneration, WildcardGeneration);
+
+            public void Dispose()
+            {
+                lock (Fence._gate)
+                {
+                    State.Readers--;
+                    Fence.Prune(Key, State);
+                }
+            }
+        }
+
+        public Fill Enter(string key)
+        {
+            lock (_gate)
+            {
+                var state = GetOrAdd(key);
+                state.Readers++;
+                return new Fill(this, key, state, state.Generation, _wildcardGeneration);
+            }
+        }
+
+        public async Task StoreAsync(Fill fill, Func<Task> store)
+        {
+            TaskCompletionSource<bool> completion;
+            var state = fill.State;
+            lock (_gate)
+            {
+                if (state.Invalidations != 0 || _wildcardInvalidations != 0 ||
+                    fill.KeyGeneration != state.Generation || fill.WildcardGeneration != _wildcardGeneration)
+                {
+                    return;
+                }
+
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                state.PendingStores.Add(completion.Task);
+            }
+
+            try
+            {
+                await store();
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    state.PendingStores.Remove(completion.Task);
+                }
+
+                completion.SetResult(true);
+            }
+        }
+
+        public async Task<TResult> InvalidateAsync<TResult>(Func<Task<TResult>> invalidate, string[]? keys = null)
+        {
+            Task[] pending;
+            var affected = new List<KeyValuePair<string, KeyFills>>();
+            lock (_gate)
+            {
+                if (keys is null)
+                {
+                    _wildcardGeneration++;
+                    _wildcardInvalidations++;
+                    pending = _keys.Values.SelectMany(state => state.PendingStores).ToArray();
+                }
+                else
+                {
+                    foreach (var key in keys.Distinct(StringComparer.Ordinal))
+                    {
+                        var state = GetOrAdd(key);
+                        state.Generation++;
+                        state.Invalidations++;
+                        affected.Add(new(key, state));
+                    }
+
+                    pending = affected.SelectMany(entry => entry.Value.PendingStores).ToArray();
+                }
+            }
+
+            try
+            {
+                // A fill already writing must finish before deletion. New stores cannot enter the fence.
+                await Task.WhenAll(pending);
+                return await invalidate();
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    if (keys is null)
+                    {
+                        _wildcardGeneration++;
+                        _wildcardInvalidations--;
+                    }
+                    else
+                    {
+                        foreach (var (key, state) in affected)
+                        {
+                            state.Generation++;
+                            state.Invalidations--;
+                            Prune(key, state);
+                        }
+                    }
+                }
+            }
+        }
+
+        private KeyFills GetOrAdd(string key)
+        {
+            if (!_keys.TryGetValue(key, out var state))
+            {
+                state = new KeyFills();
+                _keys.Add(key, state);
+            }
+
+            return state;
+        }
+
+        private void Prune(string key, KeyFills state)
+        {
+            if (state.Readers == 0 && state.Invalidations == 0)
+            {
+                _keys.Remove(key);
+            }
+        }
+    }
 
     private static readonly TimeSpan FlightWaitTimeout = TimeSpan.FromSeconds(30);
 
@@ -40,6 +188,7 @@ public class RedisCacheService : IRedisCacheService
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _keyPrefix = keyPrefix ?? _options.KeyPrefix;
+        _fillFence = FillFences.GetValue(provider, static _ => new FillFence());
     }
 
     public async Task<T> GetAsync<T>(string key)
@@ -58,7 +207,7 @@ public class RedisCacheService : IRedisCacheService
     public async Task<bool> RemoveAsync(string key)
     {
         var fullKey = GetFullKey(key);
-        return await _provider.RemoveAsync(fullKey);
+        return await _fillFence.InvalidateAsync(() => _provider.RemoveAsync(fullKey), new[] { fullKey });
     }
 
     public async Task<bool> ExistsAsync(string key)
@@ -86,7 +235,11 @@ public class RedisCacheService : IRedisCacheService
     public async Task RemoveManyAsync(params string[] keys)
     {
         var fullKeys = keys.Select(GetFullKey).ToArray();
-        await _provider.RemoveManyAsync(fullKeys);
+        await _fillFence.InvalidateAsync(async () =>
+        {
+            await _provider.RemoveManyAsync(fullKeys);
+            return true;
+        }, fullKeys);
     }
 
     public async Task<long> RemoveByPatternAsync(string pattern)
@@ -99,10 +252,10 @@ public class RedisCacheService : IRedisCacheService
         var fullPattern = GetFullKey(pattern);
         if (fullPattern.IndexOfAny(GlobChars) < 0)
         {
-            return await _provider.RemoveAsync(fullPattern) ? 1 : 0;
+            return await _fillFence.InvalidateAsync(() => _provider.RemoveAsync(fullPattern), new[] { fullPattern }) ? 1 : 0;
         }
 
-        return await _provider.RemoveByPatternAsync(fullPattern);
+        return await _fillFence.InvalidateAsync(() => _provider.RemoveByPatternAsync(fullPattern));
     }
 
     public async Task<bool> SetIfNotExistsAsync<T>(string key, T value, TimeSpan? expiration = null)
@@ -131,7 +284,8 @@ public class RedisCacheService : IRedisCacheService
             _logger.LogWarning(ex, "Cache read failed; loading from origin");
         }
 
-        var flightKey = new FlightKey(_provider, fullKey, typeof(T));
+        using var fill = _fillFence.Enter(fullKey);
+        var flightKey = fill.FlightKey(typeof(T));
         var tcs = new TaskCompletionSource<Snapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         var existing = Flights.GetOrAdd(flightKey, tcs.Task);
 
@@ -153,7 +307,7 @@ public class RedisCacheService : IRedisCacheService
             var independent = await factory();
             if (!readFailed)
             {
-                await TryStoreAsync(fullKey, independent, expiration);
+                await TryStoreAsync(fullKey, independent, expiration, fill);
             }
 
             return independent;
@@ -177,7 +331,7 @@ public class RedisCacheService : IRedisCacheService
             tcs.TrySetResult(CreateSnapshot(value));
             if (!readFailed)
             {
-                await TryStoreAsync(fullKey, value, expiration);
+                await TryStoreAsync(fullKey, value, expiration, fill);
             }
 
             return value;
@@ -204,7 +358,7 @@ public class RedisCacheService : IRedisCacheService
         return (await _provider.ExistsAsync(fullKey), cached);
     }
 
-    private async Task TryStoreAsync<T>(string fullKey, T value, TimeSpan? expiration)
+    private async Task TryStoreAsync<T>(string fullKey, T value, TimeSpan? expiration, FillFence.Fill fill)
     {
         if (EqualityComparer<T>.Default.Equals(value, default!))
         {
@@ -213,7 +367,7 @@ public class RedisCacheService : IRedisCacheService
 
         try
         {
-            await _provider.SetAsync(fullKey, value, expiration ?? _options.DefaultExpiration);
+            await _fillFence.StoreAsync(fill, () => _provider.SetAsync(fullKey, value, expiration ?? _options.DefaultExpiration));
         }
         catch (Exception ex)
         {
