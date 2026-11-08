@@ -50,7 +50,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         if (!value.HasValue)
             return default(T);
 
-        return Deserialize<T>(value);
+        return Deserialize<T>(key, value);
     }
 
     async Task<(bool Found, T Value)> IRedisValueProbe.TryGetAsync<T>(string key)
@@ -72,7 +72,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Failed to deserialize cached value ({ExceptionType})", ex.GetType().Name);
+            _logger.LogWarning("Failed to deserialize cached value for key {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
             return (false, default!);
         }
     }
@@ -106,7 +106,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         {
             if (values[i].HasValue)
             {
-                dictionary[keys[i]] = Deserialize<T>(values[i]);
+                dictionary[keys[i]] = Deserialize<T>(keys[i], values[i]);
             }
         }
 
@@ -210,7 +210,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         if (!value.HasValue)
             return default(T);
 
-        return Deserialize<T>(value);
+        return Deserialize<T>(key, value);
     }
 
     public async Task<bool> HashSetAsync<T>(string key, string field, T value)
@@ -227,7 +227,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
 
         return hash.ToDictionary(
             entry => entry.Name.ToString(),
-            entry => Deserialize<T>(entry.Value)
+            entry => Deserialize<T>(key, entry.Value)
         );
     }
 
@@ -243,7 +243,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         if (!value.HasValue)
             return default(T);
 
-        return Deserialize<T>(value);
+        return Deserialize<T>(key, value);
     }
 
     public async Task<List<T>> ListGetRangeAsync<T>(string key, long start, long stop)
@@ -252,7 +252,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         if (values == null || values.Length == 0)
             return new List<T>();
 
-        return values.Select(Deserialize<T>).ToList();
+        return values.Select(item => Deserialize<T>(key, item)).ToList();
     }
 
     public async Task<bool> SetAddAsync<T>(string key, T value)
@@ -273,7 +273,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         if (values == null || values.Length == 0)
             return new List<T>();
 
-        return values.Select(Deserialize<T>).ToList();
+        return values.Select(item => Deserialize<T>(key, item)).ToList();
     }
 
     private static string? Serialize<T>(T value)
@@ -287,7 +287,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         return JsonConvert.SerializeObject(value, RedisJsonSettings.Settings);
     }
 
-    private T Deserialize<T>(RedisValue value)
+    private T Deserialize<T>(string key, RedisValue value)
     {
         if (!value.HasValue || value.IsNullOrEmpty)
             return default(T);
@@ -303,7 +303,7 @@ public class StackExchangeRedisProvider : IRedisProvider, IRedisValueProbe
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialize Redis value of type {Type}", typeof(T).Name);
+            _logger.LogError("Failed to deserialize Redis value for key {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
             return default(T);
         }
     }

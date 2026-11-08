@@ -53,7 +53,7 @@ public class RedisCacheService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error retrieving from cache for key: {Key}", key);
+            logger.LogError("Error retrieving from cache for key: {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
             return default;
         }
     }
@@ -202,7 +202,7 @@ public class RedisCacheService(
         }
         catch (Exception ex) when (!faulted)
         {
-            logger.LogError(ex, "Error in GetOrSetAsync for key: {Key}, calling factory directly", key);
+            logger.LogError("Error in GetOrSetAsync for key: {Key} as {Type} ({ExceptionType}), calling factory directly", key, typeof(T).Name, ex.GetType().Name);
             return loaded ? value! : await factory();
         }
     }
