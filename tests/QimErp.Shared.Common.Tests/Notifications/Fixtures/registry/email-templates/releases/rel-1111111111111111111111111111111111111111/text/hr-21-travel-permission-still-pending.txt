@@ -1,0 +1,14 @@
+Your travel permission is still pending
+
+Hi {{FirstName}},
+Your travel permission request is still pending and you depart soon.
+
+Reference: {{Reference}}
+
+View travel request: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

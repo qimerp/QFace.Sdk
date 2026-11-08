@@ -1,0 +1,13 @@
+{{TenderRef}} — QFace Solutions
+
+Hi {{FirstName}},
+We read tender {{TenderRef}} and our HR and payroll scope matches {{TenderLots}}.
+
+{{SenderName}} · QFace Solutions · {{SenderPhone}}
+
+—
+You received this because you asked to hear from QIM ERP. You can unsubscribe at any time.
+Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Unsubscribe: {{UnsubscribeUrl}}
+Manage preferences: {{PreferencesUrl}}
+Privacy: https://qimerp.com/privacy

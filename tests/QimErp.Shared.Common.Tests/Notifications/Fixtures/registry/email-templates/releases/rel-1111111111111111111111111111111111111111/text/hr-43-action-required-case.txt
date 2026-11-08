@@ -1,0 +1,17 @@
+Action required on case {{Reference}}
+
+Hi {{FirstName}},
+There's an action required on a case you're part of.
+
+Due: {{DueDate}}
+Reference: {{Reference}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+Open case: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -1,0 +1,20 @@
+Intercompany transaction {{Reference}} requires review
+
+Hi {{FirstName}},
+An intercompany transaction doesn't match on both sides.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Period: {{Period}}
+Reference: {{Reference}}
+
+Review transaction: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

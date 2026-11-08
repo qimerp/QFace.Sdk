@@ -1,0 +1,17 @@
+An approval needs your review
+
+Hi there,
+Sample Requester sent a request that needs your approval.
+
+Due: Not set
+Stage: 2 of 3
+Requested by: Sample Requester
+When: 7 Nov 2026, 09:42 UTC
+
+Review request: https://app.example.qimerp.com/workflow/entity/leave-request/example-id/review
+
+—
+You received this because an approval in Example Tenant needs your review.
+Example Tenant · sent with QIM ERP
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

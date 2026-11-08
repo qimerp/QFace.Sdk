@@ -1,0 +1,15 @@
+4 imprest retirements overdue
+
+Hi {{FirstName}},
+Some imprest retirements are past their due date.
+
+{{ItemLines}}
+{{ItemsMore}}
+
+Review overdue imprests: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -1,0 +1,21 @@
+{{FilingType}} for {{Period}} needs review
+
+Hi {{FirstName}},
+A tax filing needs action.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Due: {{DueDate}}
+Period: {{Period}}
+Reference: {{Reference}}
+
+Review filing: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

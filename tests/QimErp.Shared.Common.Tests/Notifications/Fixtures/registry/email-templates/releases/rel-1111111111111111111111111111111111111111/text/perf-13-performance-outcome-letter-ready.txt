@@ -1,0 +1,20 @@
+Your performance outcome letter is ready
+
+Hi {{FirstName}},
+Your performance outcome letter is ready to view.
+
+Document: {{DocumentName}} (Available in your secure workspace)
+
+Due: {{DueDate}}
+Cycle: {{CycleName}}
+Contact: {{Contact}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+View authenticated letter: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

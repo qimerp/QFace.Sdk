@@ -1,0 +1,16 @@
+Your retirement planning reminder
+
+Hi {{FirstName}},
+It's time to start planning for your retirement.
+
+Due: {{DueDate}}
+Employee: {{EmployeeName}}
+Contact: {{Contact}}
+
+Open retirement checklist: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

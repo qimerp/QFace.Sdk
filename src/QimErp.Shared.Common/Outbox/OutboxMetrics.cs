@@ -3,7 +3,7 @@ using System.Diagnostics.Metrics;
 namespace QimErp.Shared.Common.Outbox;
 
 /// <summary>
-/// DATA-32 outbox drift signals (enqueued / published / processed / failed / batch size / pending sample).
+/// DATA-32 outbox drift signals (enqueued / published / processed / failed / batch size / pending sample / unclaimable sample).
 /// </summary>
 public static class OutboxMetrics
 {
@@ -22,6 +22,7 @@ public static class OutboxMetrics
         Meter.CreateHistogram<long>("outbox.batch.size", description: "Pending ids claimed per processor sweep");
 
     private static long _pendingSample;
+    private static long _unclaimableSample;
 
     static OutboxMetrics()
     {
@@ -29,6 +30,10 @@ public static class OutboxMetrics
             "outbox.messages.pending",
             () => Volatile.Read(ref _pendingSample),
             description: "Last observed unprocessed count from a processor sweep batch claim");
+        Meter.CreateObservableGauge(
+            "outbox.messages.unclaimable",
+            () => Volatile.Read(ref _unclaimableSample),
+            description: "Pending in-process rows whose EventType has no CLR type in this process, from the last relay probe");
     }
 
     public static void RecordEnqueued(int count = 1)
@@ -53,6 +58,12 @@ public static class OutboxMetrics
     {
         if (count > 0)
             Failed.Add(count);
+    }
+
+    public static void RecordUnclaimable(long pending)
+    {
+        if (pending >= 0)
+            Volatile.Write(ref _unclaimableSample, pending);
     }
 
     public static void RecordSweepBatch(int claimedPending)

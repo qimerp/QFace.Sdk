@@ -1,0 +1,18 @@
+We couldn’t collect payment for invoice {{InvoiceNumber}}
+
+Hi {{FirstName}},
+We couldn't collect payment for invoice {{InvoiceNumber}} from your saved payment method.
+
+Outstanding balance: {{Amount}}
+{{AmountNote}}
+
+Invoice: {{InvoiceNumber}}
+
+Pay invoice: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

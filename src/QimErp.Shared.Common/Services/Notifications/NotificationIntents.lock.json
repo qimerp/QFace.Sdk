@@ -1,0 +1,7 @@
+{
+  "contracts": {
+    "auth.password_reset.requested@1": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682",
+    "workflow.approval.requested@1": "3be98cb078110858d66aff7b2e0272043f022f5fb0153143bbb416e1d785e4fb"
+  },
+  "revision": "374b00274fb61159e8e2af7183b3b60e19aac0006d2d9d4c6040d352eee7886d"
+}

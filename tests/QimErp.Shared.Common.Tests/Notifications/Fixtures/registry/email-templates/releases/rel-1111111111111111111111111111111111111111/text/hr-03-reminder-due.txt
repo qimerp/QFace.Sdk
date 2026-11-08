@@ -1,0 +1,17 @@
+Reminder: {{TaskTitle}} is due {{DueDate}}
+
+Hi {{FirstName}},
+A friendly reminder that an onboarding task is due soon.
+
+Due: {{DueDate}}
+Stage: {{Stage}}
+Employee: {{EmployeeName}}
+When: {{OccurredAt}}
+
+Open task: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

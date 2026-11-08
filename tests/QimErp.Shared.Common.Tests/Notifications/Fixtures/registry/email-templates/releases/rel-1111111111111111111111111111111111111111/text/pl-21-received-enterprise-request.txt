@@ -1,0 +1,18 @@
+We received your QimERP enterprise request
+
+Hi {{FirstName}},
+Thanks for your interest in QIM ERP for {{CompanyName}}. We've received your enterprise request.
+
+Workspace: {{WorkspaceUrl}}
+Stage: {{Stage}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+Open QIM ERP: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

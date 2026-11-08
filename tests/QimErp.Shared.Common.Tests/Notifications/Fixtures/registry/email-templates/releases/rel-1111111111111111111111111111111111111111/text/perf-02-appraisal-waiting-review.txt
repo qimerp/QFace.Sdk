@@ -1,0 +1,15 @@
+Appraisal waiting for your review
+
+Hi {{FirstName}},
+{{EmployeeName}} submitted their self-review and it's ready for you.
+
+Due: {{DueDate}}
+Employee: {{EmployeeName}}
+
+Review appraisal: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

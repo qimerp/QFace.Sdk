@@ -1,0 +1,17 @@
+An approval needs your review
+
+Hi {{FirstName}},
+{{RequesterName}} sent a request that needs your approval.
+
+Due: {{DueDate}}
+Stage: {{Stage}}
+Requested by: {{RequesterName}}
+When: {{OccurredAt}}
+
+Review request: {{ActionUrl}}
+
+—
+You received this because an approval in {{TenantName}} needs your review.
+{{TenantName}} · sent with QIM ERP
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

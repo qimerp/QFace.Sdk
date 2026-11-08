@@ -1,0 +1,18 @@
+Travel permission {{Status}}
+
+Hi {{FirstName}},
+Your travel permission was approved.
+
+Stage: {{Stage}}
+Dates: {{Dates}}
+When: {{OccurredAt}}
+Reference: {{Reference}}
+Contact: {{Contact}}
+
+Open request: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -1,0 +1,20 @@
+Your offer from {{TenantName}} is ready
+
+Hello,
+Your offer from {{TenantName}} is ready to review.
+
+Document: {{DocumentName}} (Available in your secure workspace)
+
+Due: {{DueDate}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+Review offer: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} recruitment team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

@@ -1,0 +1,15 @@
+Update on your {{TenantName}} workspace request
+
+Hi {{FirstName}},
+We reviewed your workspace request for {{TenantName}} and can't approve it yet.
+
+Workspace: {{WorkspaceUrl}}
+
+Open QIM ERP: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

@@ -1,0 +1,18 @@
+Set up your QimERP account for {{TenantName}}
+
+Hi {{FirstName}},
+{{TenantName}} created a QIM ERP account for you. Set a password to sign in for the first time.
+
+Sign-in address: {{Email}}
+Link expires: {{LinkExpiresAt}}
+
+Set password: {{ActionUrl}}
+
+This link works once and expires on {{LinkExpiresAt}}. If it has expired, ask your administrator to resend it.
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

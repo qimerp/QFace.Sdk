@@ -1,0 +1,16 @@
+You were assigned {{TaskTitle}} in {{ProjectName}}
+
+Hi {{FirstName}},
+A project task was assigned to you.
+
+Due: {{DueDate}}
+When: {{OccurredAt}}
+Project: {{ProjectName}}
+
+Open task: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
