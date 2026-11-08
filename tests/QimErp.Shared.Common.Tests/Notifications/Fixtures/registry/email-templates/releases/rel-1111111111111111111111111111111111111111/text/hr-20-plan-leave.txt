@@ -1,0 +1,15 @@
+Plan your leave by {{Deadline}}
+
+Hi {{FirstName}},
+You haven't planned enough leave for {{PlanYear}} yet.
+
+Due: {{DueDate}}
+Plan: {{PlanName}}
+
+Open planner: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

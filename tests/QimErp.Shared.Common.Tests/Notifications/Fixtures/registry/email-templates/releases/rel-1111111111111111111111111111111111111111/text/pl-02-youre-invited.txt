@@ -1,0 +1,19 @@
+You’re invited to {{TenantName}} on QimERP
+
+Hi {{FirstName}},
+{{InviterName}} invited you to join the {{TenantName}} workspace on QIM ERP.
+
+Sign-in address: {{Email}}
+Workspace: {{WorkspaceUrl}}
+Link expires: {{LinkExpiresAt}}
+
+Accept invitation: {{ActionUrl}}
+
+This link works once and expires on {{LinkExpiresAt}}. If it has expired, ask your administrator to resend it.
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

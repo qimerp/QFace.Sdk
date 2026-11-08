@@ -1,0 +1,20 @@
+Withholding certificate {{CertificateNumber}} is ready
+
+Hello,
+Your withholding tax certificate is ready.
+
+Document: {{DocumentName}} ({{DocumentMeta}})
+
+Amount: {{Amount}}
+Period: {{Period}}
+Reference: {{Reference}}
+
+Download certificate: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} procurement team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

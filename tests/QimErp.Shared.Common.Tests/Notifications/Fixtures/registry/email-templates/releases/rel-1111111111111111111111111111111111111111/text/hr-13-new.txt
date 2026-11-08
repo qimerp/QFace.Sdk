@@ -1,0 +1,15 @@
+New {{NewsType}}: {{Title}}
+
+Hi {{FirstName}},
+{{TenantName}} published a new {{NewsType}}.
+
+{{ItemLines}}
+{{ItemsMore}}
+
+Read announcement: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

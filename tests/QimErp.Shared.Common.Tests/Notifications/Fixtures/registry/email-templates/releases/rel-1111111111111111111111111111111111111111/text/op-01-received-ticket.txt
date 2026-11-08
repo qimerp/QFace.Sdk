@@ -1,0 +1,18 @@
+We received ticket {{TicketNumber}}: {{TicketSubject}}
+
+Hi {{FirstName}},
+We received your support ticket and our team will look at it shortly.
+
+Ticket: {{TicketTitle}}
+Priority: {{Priority}}
+Module: {{ModuleName}}
+Reference: {{Reference}}
+
+View ticket: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

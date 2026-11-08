@@ -1,0 +1,17 @@
+Stay with QimERP: {{Discount}} off for {{Months}}
+
+Hi {{FirstName}},
+We'd like to keep working with you. Here's an offer for {{TenantName}}.
+
+Link expires: {{LinkExpiresAt}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+Open QIM ERP: {{ActionUrl}}
+
+—
+You received this because you asked to hear from QIM ERP. You can unsubscribe at any time.
+Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Unsubscribe: {{UnsubscribeUrl}}
+Manage preferences: {{PreferencesUrl}}
+Privacy: https://qimerp.com/privacy

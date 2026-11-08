@@ -1,0 +1,16 @@
+Response requested on {{TicketNumber}} before {{Date}}
+
+Hi {{FirstName}},
+We're waiting for your reply on {{TicketNumber}}. It closes automatically if we don't hear back.
+
+Ticket: {{TicketTitle}}
+Due: {{DueDate}}
+
+Reply to ticket: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

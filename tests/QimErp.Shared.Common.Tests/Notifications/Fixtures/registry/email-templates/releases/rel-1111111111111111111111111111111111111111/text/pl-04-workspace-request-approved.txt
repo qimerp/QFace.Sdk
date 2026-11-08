@@ -1,0 +1,17 @@
+Your {{TenantName}} workspace request was approved
+
+Hi {{FirstName}},
+Good news: your workspace request for {{TenantName}} was approved on {{DecisionDate}}.
+
+Workspace: {{WorkspaceUrl}}
+
+Sign in: {{ActionUrl}}
+
+Check setup status: {{SecondaryActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

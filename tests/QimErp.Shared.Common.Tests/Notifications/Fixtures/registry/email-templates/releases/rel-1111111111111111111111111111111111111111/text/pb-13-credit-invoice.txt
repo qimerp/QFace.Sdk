@@ -1,0 +1,20 @@
+Credit for invoice {{InvoiceNumber}}
+
+Hi {{FirstName}},
+We issued a refund for invoice {{InvoiceNumber}}.
+
+Refund: {{Amount}}
+{{AmountNote}}
+
+Invoice: {{InvoiceNumber}}
+Reference: {{Reference}}
+Effective: {{EffectiveDate}}
+
+View billing history: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

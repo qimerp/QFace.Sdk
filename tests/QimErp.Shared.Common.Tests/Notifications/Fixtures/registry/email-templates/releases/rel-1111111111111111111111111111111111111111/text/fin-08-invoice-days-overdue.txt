@@ -1,0 +1,19 @@
+Invoice {{InvoiceNumber}} is {{DaysOverdue}} days overdue
+
+Hi {{FirstName}},
+Invoice {{InvoiceNumber}} is now {{DaysOverdue}} days overdue.
+
+Outstanding balance: {{Amount}}
+{{AmountNote}}
+
+Invoice: {{InvoiceNumber}}
+Due: {{DueDate}}
+Reference: {{Reference}}
+
+View invoice: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

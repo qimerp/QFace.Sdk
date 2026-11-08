@@ -1,0 +1,19 @@
+Your payslip for {{Period}} is ready
+
+Hi {{FirstName}},
+Your payslip for {{Period}} is ready.
+
+Document: {{DocumentName}} (Available in your secure workspace)
+
+Period: {{Period}}
+Employee: {{EmployeeName}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+View payslip: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

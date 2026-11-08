@@ -1,0 +1,16 @@
+Set up your {{TenantName}} {{PortalType}} portal access
+
+Hello,
+{{TenantName}} gave you access to its {{PortalType}} portal.
+
+Link expires: {{LinkExpiresAt}}
+
+Activate access: {{ActionUrl}}
+
+This link works once and expires on {{LinkExpiresAt}}. If it has expired, ask your administrator to resend it.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

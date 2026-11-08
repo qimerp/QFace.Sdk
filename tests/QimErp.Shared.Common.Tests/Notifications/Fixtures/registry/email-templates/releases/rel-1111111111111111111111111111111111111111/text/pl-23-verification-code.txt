@@ -1,0 +1,20 @@
+Your QimERP verification code
+
+Hi {{FirstName}},
+Use this code to finish signing in to QIM ERP.
+
+Code: {{Code}}
+Expires in 10 minutes. Don’t share this code with anyone.
+
+Link expires: {{LinkExpiresAt}}
+
+Open QIM ERP: {{ActionUrl}}
+
+If you didn’t expect this email, you can ignore it, or tell us at security@qimerp.com.
+
+—
+This is a security notice about your QIM ERP account. We send it even if you turned off other emails.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy
+Report suspicious activity: mailto:security@qimerp.com

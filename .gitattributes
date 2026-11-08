@@ -1,0 +1,3 @@
+tests/QimErp.Shared.Common.Tests/Notifications/Fixtures/** -text
+src/QimErp.Shared.Common/Services/Notifications/NotificationIntents.lock.json -text
+src/QimErp.Shared.Common/Services/Notifications/NotificationIntents.g.cs -text

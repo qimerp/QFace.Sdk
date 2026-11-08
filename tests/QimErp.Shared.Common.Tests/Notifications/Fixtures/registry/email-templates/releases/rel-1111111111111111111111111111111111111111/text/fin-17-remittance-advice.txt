@@ -1,0 +1,19 @@
+Remittance advice {{PaymentRef}} from {{TenantName}}
+
+Hello,
+{{TenantName}} sent you a payment.
+
+Outstanding balance: {{Amount}}
+{{AmountNote}}
+
+When: {{OccurredAt}}
+
+View remittance: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} procurement team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

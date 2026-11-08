@@ -24,7 +24,10 @@ public static class OutboxServiceCollectionExtensions
         services.TryAddSingleton<ITransportRouting, TransportRouting>();
 
         services.TryAddScoped<OutboxStore>(sp =>
-            new OutboxStore(sp.GetRequiredService<TContext>(), sp.GetRequiredService<ILogger<OutboxStore>>()));
+            new OutboxStore(
+                sp.GetRequiredService<TContext>(),
+                sp.GetRequiredService<ILogger<OutboxStore>>(),
+                sp.GetRequiredService<InProcessEventTypeCatalog>()));
 
         services.TryAddScoped<IOutbox>(sp =>
             new EfOutbox(
@@ -46,6 +49,10 @@ public static class OutboxServiceCollectionExtensions
 
         services.TryAddSingleton<IOutboxEventTypeResolver>(sp =>
             new OutboxEventTypeResolver(sp.GetServices<OutboxEventTypeRegistration>()));
+        services.TryAddSingleton(sp =>
+            new InProcessEventTypeCatalog(
+                sp.GetRequiredService<IOutboxEventTypeResolver>(),
+                sp.GetServices<OutboxEventTypeRegistration>()));
 
         if (!services.Any(d => d.ImplementationType == typeof(OutboxRelayHostedService)))
             services.AddHostedService<OutboxRelayHostedService>();

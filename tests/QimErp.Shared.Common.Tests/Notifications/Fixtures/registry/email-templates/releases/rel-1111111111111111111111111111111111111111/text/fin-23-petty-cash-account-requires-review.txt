@@ -1,0 +1,20 @@
+Petty cash account {{CashAccountRef}} requires review
+
+Hi {{FirstName}},
+A petty cash account is below its replenishment level.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Amount: {{Amount}}
+When: {{OccurredAt}}
+
+Review petty cash: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

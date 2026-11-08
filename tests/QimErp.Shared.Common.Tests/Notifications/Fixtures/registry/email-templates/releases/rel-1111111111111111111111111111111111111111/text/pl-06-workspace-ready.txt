@@ -1,0 +1,21 @@
+Your {{TenantName}} workspace is ready
+
+Hi {{FirstName}},
+Your {{TenantName}} workspace is set up and ready to use.
+
+Sign-in address: {{Email}}
+Workspace: {{WorkspaceUrl}}
+Stage: {{Stage}}
+Employee: {{EmployeeName}}
+When: {{OccurredAt}}
+
+Open workspace: {{ActionUrl}}
+
+This link works once and expires on {{LinkExpiresAt}}. If it has expired, ask your administrator to resend it.
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

@@ -1,0 +1,20 @@
+Plan your {{TenantName}} QimERP renewal review
+
+Hi {{FirstName}},
+It's time to plan your QIM ERP renewal review.
+
+{{EventDate}}
+{{EventTime}}
+{{EventLocation}}
+
+Workspace: {{WorkspaceUrl}}
+Plan: {{PlanName}}
+
+Book review: {{ActionUrl}}
+
+—
+You received this because you asked to hear from QIM ERP. You can unsubscribe at any time.
+Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Unsubscribe: {{UnsubscribeUrl}}
+Manage preferences: {{PreferencesUrl}}
+Privacy: https://qimerp.com/privacy

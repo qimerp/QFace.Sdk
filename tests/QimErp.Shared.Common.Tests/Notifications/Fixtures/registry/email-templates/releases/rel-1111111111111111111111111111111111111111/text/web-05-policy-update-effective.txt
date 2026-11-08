@@ -1,0 +1,15 @@
+QimERP policy update effective {{Date}}
+
+Hi {{FirstName}},
+We're updating our Terms of Service, effective {{EffectiveDate}}.
+
+Effective: {{EffectiveDate}}
+
+Review changes: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

@@ -1,0 +1,17 @@
+Request for quotation {{RfqNumber}} from {{TenantName}}
+
+Hello,
+{{TenantName}} invites you to quote.
+
+Due: {{DueDate}}
+When: {{OccurredAt}}
+
+View RFQ: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} procurement team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

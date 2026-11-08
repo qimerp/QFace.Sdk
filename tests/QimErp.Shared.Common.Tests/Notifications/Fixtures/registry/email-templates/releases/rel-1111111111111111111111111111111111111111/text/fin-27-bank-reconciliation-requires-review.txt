@@ -1,0 +1,20 @@
+Bank reconciliation {{ReconciliationNumber}} requires review
+
+Hi {{FirstName}},
+A bank reconciliation needs your review.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Period: {{Period}}
+Count: {{Count}}
+
+Review reconciliation: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

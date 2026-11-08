@@ -1,0 +1,15 @@
+Low stock at {{WarehouseName}}: {{SkuCount}} items
+
+Hi {{FirstName}},
+Some items at {{WarehouseName}} are below their reorder level.
+
+{{ItemLines}}
+{{ItemsMore}}
+
+Review replenishment: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
