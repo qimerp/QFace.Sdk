@@ -1,0 +1,18 @@
+We received your application for {{RoleTitle}}
+
+Hello,
+Thank you for applying. We received your application.
+
+Stage: {{Stage}}
+Reference: {{Reference}}
+Contact: {{Contact}}
+
+View application: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} recruitment team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

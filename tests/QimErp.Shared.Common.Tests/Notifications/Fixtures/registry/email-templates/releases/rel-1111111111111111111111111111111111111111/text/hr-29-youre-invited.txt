@@ -1,0 +1,17 @@
+You’re invited: {{SurveyTitle}}
+
+Hi {{FirstName}},
+You're invited to take part in a short survey.
+
+Link expires: {{LinkExpiresAt}}
+Due: {{DueDate}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+Open survey: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

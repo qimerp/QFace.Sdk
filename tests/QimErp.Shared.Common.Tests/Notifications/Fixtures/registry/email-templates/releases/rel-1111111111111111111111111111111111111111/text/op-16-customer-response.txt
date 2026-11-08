@@ -1,0 +1,17 @@
+Customer response on {{TicketNumber}}
+
+Hi {{FirstName}},
+The customer replied on {{TicketNumber}} and the ticket was reopened.
+
+Ticket: {{TicketTitle}}
+Priority: {{Priority}}
+Reference: {{Reference}}
+
+Open ticket: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

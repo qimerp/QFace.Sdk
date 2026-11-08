@@ -7,7 +7,7 @@
         
         <!-- NuGet Package Metadata -->
         <PackageId>QimErp.Shared.Common</PackageId>
-        <Version>3.11.41</Version>
+        <Version>3.11.46</Version>
         <Authors>IAmQwame</Authors>
         <Company>QimErp</Company>
         <Description>Shared common library for QimErp microservices ERP system. Contains common entities, contracts, services, and utilities used across all QimErp modules.</Description>
@@ -27,6 +27,10 @@
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
     
+    <ItemGroup>
+        <EmbeddedResource Include="Services/Notifications/NotificationIntents.lock.json" LogicalName="QimErp.Shared.Common.NotificationIntents.lock.json" />
+    </ItemGroup>
+
     <!-- Framework References -->
     <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App" />

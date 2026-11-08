@@ -1,0 +1,15 @@
+{{CompanyName}} walkthrough
+
+Hi {{FirstName}},
+Thanks for your reply. Here’s a link to book the walkthrough with your finance and HR leads.
+
+Book a time: {{ActionUrl}}
+
+{{SenderName}} · QFace Solutions · {{SenderPhone}}
+
+—
+You received this because you asked to hear from QIM ERP. You can unsubscribe at any time.
+Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Unsubscribe: {{UnsubscribeUrl}}
+Manage preferences: {{PreferencesUrl}}
+Privacy: https://qimerp.com/privacy

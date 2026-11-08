@@ -2,6 +2,7 @@ using Akka.Actor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using QimErp.Shared.Common.Outbox.Transports;
 
 namespace QimErp.Shared.Common.Outbox.Actors;
 
@@ -61,6 +62,10 @@ internal sealed class OutboxPollerActor : ReceiveActor, IWithTimers
             {
                 _logger.LogDebug("Outbox claimed {Count} row(s) on node {Node}", batch.Count, _node);
             }
+
+            var catalog = scope.ServiceProvider.GetService<InProcessEventTypeCatalog>();
+            if (catalog is not null && catalog.TryBeginProbe(DateTimeOffset.UtcNow))
+                await OutboxUnclaimableReporter.ReportAsync(store, _logger, _node, CancellationToken.None);
         }
         catch (Exception ex)
         {

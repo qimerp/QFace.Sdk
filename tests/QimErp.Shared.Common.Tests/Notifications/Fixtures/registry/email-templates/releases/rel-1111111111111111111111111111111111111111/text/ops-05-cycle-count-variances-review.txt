@@ -1,0 +1,23 @@
+Cycle count {{CountNumber}} has variances to review
+
+Hi {{FirstName}},
+A cycle count has variances to review.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Due: {{DueDate}}
+Stage: {{Stage}}
+Cycle: {{CycleName}}
+Warehouse: {{WarehouseName}}
+Count: {{Count}}
+
+Review variances: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

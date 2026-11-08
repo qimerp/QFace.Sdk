@@ -1,0 +1,18 @@
+New reply on {{TicketNumber}}: {{TicketSubject}}
+
+Hi {{FirstName}},
+There's a new reply on your support ticket.
+
+Ticket: {{TicketTitle}}
+Reference: {{Reference}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+View reply: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

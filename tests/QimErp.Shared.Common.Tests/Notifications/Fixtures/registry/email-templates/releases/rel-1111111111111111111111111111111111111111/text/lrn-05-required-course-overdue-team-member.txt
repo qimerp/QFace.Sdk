@@ -1,0 +1,17 @@
+A required course is overdue for your team member
+
+Hi {{FirstName}},
+A required course is overdue for someone on your team.
+
+Due: {{DueDate}}
+Stage: {{Stage}}
+Employee: {{EmployeeName}}
+Course: {{CourseName}}
+
+Open team learning: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -1,0 +1,16 @@
+{{ItemTitle}} entered approval
+
+Hi {{FirstName}},
+{{ItemTitle}} entered approval and is now with its first approver.
+
+Stage: {{Stage}}
+Requested by: {{RequesterName}}
+Reference: {{Reference}}
+
+View progress: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -1,0 +1,16 @@
+We received your QimERP demo request
+
+Hi {{FirstName}},
+Thanks for requesting a QIM ERP demo. We've received your request.
+
+When: {{OccurredAt}}
+Reference: {{Reference}}
+
+Manage request: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

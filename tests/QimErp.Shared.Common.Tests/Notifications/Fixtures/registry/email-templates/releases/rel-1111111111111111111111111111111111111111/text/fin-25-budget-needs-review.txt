@@ -1,0 +1,20 @@
+Budget {{BudgetNumber}} needs review
+
+Hi {{FirstName}},
+A budget control threshold was crossed.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Tenant: {{TenantName}}
+Amount: {{Amount}}
+
+View budget: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
