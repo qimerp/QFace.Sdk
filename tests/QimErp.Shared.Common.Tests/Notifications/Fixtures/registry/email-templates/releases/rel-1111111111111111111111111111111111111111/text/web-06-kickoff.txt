@@ -1,0 +1,19 @@
+Your QimERP kickoff: {{Date}}
+
+Hi {{FirstName}},
+Your QIM ERP onboarding kickoff is confirmed.
+
+{{EventDate}}
+{{EventTime}}
+{{EventLocation}}
+
+Employee: {{EmployeeName}}
+
+View meeting: {{ActionUrl}}
+
+—
+You received this because you asked to hear from QIM ERP. You can unsubscribe at any time.
+Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Unsubscribe: {{UnsubscribeUrl}}
+Manage preferences: {{PreferencesUrl}}
+Privacy: https://qimerp.com/privacy

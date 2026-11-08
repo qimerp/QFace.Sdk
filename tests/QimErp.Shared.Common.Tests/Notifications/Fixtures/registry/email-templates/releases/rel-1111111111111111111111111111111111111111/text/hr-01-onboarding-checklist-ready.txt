@@ -1,0 +1,18 @@
+Your onboarding checklist is ready
+
+Hi {{FirstName}},
+Welcome to {{TenantName}}! Your onboarding checklist is ready for your start on {{StartDate}}.
+
+Due: {{DueDate}}
+Stage: {{Stage}}
+Contact: {{Contact}}
+
+Open checklist: {{ActionUrl}}
+
+This link works once and expires on {{LinkExpiresAt}}. If it has expired, ask your administrator to resend it.
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

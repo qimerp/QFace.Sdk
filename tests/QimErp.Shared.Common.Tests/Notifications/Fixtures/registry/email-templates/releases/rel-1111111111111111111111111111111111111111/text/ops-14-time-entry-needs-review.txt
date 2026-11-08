@@ -1,0 +1,15 @@
+Time entry {{EntryRef}} needs review
+
+Hi {{FirstName}},
+A time entry was submitted for your approval.
+
+Period: {{Period}}
+When: {{OccurredAt}}
+
+Review time entry: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

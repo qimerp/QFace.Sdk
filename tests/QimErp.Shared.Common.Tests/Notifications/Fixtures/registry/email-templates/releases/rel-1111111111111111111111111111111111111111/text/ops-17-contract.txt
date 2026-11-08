@@ -1,0 +1,15 @@
+Contract {{ContractRef}} is {{DeadlineState}}
+
+Hi {{FirstName}},
+A project contract is approaching its notice date.
+
+Link expires: {{LinkExpiresAt}}
+Due: {{DueDate}}
+
+Review contract: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

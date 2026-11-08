@@ -1,0 +1,21 @@
+Payment run {{RunNumber}} requires attention
+
+Hi {{FirstName}},
+A payment run needs attention before it can finish.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Amount: {{Amount}}
+When: {{OccurredAt}}
+Count: {{Count}}
+
+Review payment run: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

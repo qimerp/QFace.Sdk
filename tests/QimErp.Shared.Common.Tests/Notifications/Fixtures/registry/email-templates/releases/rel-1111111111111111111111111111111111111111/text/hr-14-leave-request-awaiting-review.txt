@@ -1,0 +1,16 @@
+Leave request awaiting your review
+
+Hi {{FirstName}},
+{{RequesterName}} submitted a leave request for your review.
+
+Employee: {{EmployeeName}}
+Dates: {{Dates}}
+When: {{OccurredAt}}
+
+Review request: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

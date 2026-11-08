@@ -1,0 +1,15 @@
+Provisional leave cover assignment
+
+Hi {{FirstName}},
+You've been named as provisional cover while {{RequesterName}} is on leave.
+
+Employee: {{EmployeeName}}
+Dates: {{Dates}}
+
+View cover: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

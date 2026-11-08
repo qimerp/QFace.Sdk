@@ -1,0 +1,16 @@
+Access review assigned: {{ReviewName}}
+
+Hi {{FirstName}},
+You've been asked to review user access for {{ReviewName}}.
+
+Due: {{DueDate}}
+Count: {{Count}}
+
+Open access review: {{ActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

@@ -1,0 +1,21 @@
+Setup for {{TenantName}} needs attention
+
+Hi {{FirstName}},
+Setup for the {{TenantName}} workspace stopped at the {{FailedStep}} step and needs a manual repair.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Workspace: {{WorkspaceUrl}}
+Stage: {{Stage}}
+
+Open onboarding queue: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

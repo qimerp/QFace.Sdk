@@ -27,6 +27,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Update="Notifications/Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\QimErp.Shared.Common\QimErp.Shared.Common.csproj" />
         <ProjectReference Include="..\..\src\QFace.Sdk.Temporal\QFace.Sdk.Temporal.csproj" />
     </ItemGroup>

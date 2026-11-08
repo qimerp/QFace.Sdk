@@ -1,0 +1,21 @@
+Project {{ProjectRef}} has a budget exception
+
+Hi {{FirstName}},
+A project crossed its budget threshold.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Period: {{Period}}
+Stage: {{Stage}}
+Project: {{ProjectName}}
+
+Review project budget: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

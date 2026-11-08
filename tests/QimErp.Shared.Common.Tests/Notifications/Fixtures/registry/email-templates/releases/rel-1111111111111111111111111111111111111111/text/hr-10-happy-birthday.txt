@@ -1,0 +1,16 @@
+Happy birthday, {{FirstName}}!
+
+Hi {{FirstName}},
+Everyone at {{TenantName}} wishes you a wonderful birthday.
+
+Tenant: {{TenantName}}
+Employee: {{EmployeeName}}
+Reference: {{Reference}}
+
+Open QIM ERP: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

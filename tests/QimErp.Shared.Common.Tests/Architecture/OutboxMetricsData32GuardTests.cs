@@ -20,6 +20,7 @@ public class OutboxMetricsData32GuardTests
         content.Should().Contain("outbox.messages.failed");
         content.Should().Contain("outbox.batch.size");
         content.Should().Contain("outbox.messages.pending");
+        content.Should().Contain("outbox.messages.unclaimable");
         content.Should().Contain("RecordEnqueued");
         content.Should().Contain("RecordPublished");
         content.Should().Contain("RecordProcessed");

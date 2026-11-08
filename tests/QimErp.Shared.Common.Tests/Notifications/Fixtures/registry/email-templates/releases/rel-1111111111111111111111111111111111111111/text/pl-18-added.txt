@@ -1,0 +1,21 @@
+{{ModuleName}} was added to {{TenantName}}
+
+Hi {{FirstName}},
+{{ModuleName}} was added to the {{TenantName}} workspace and is ready to use.
+
+Workspace: {{WorkspaceUrl}}
+Module: {{ModuleName}}
+Amount: {{Amount}}
+When: {{OccurredAt}}
+Plan: {{PlanName}}
+
+Open item: {{ActionUrl}}
+
+Manage install: {{SecondaryActionUrl}}
+
+—
+You received this because you have a QIM ERP account. For help, contact support@qimerp.com.
+QIM ERP by Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy
