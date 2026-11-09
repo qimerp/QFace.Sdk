@@ -74,7 +74,10 @@ internal sealed class InProcessEventTransport(
         return notification;
     }
 
-    private static Type? FindNotificationType(string eventType)
+    private static Type? FindNotificationType(string eventType) =>
+        NotificationTypes().FirstOrDefault(t => string.Equals(t.Name, eventType, StringComparison.OrdinalIgnoreCase));
+
+    internal static IEnumerable<Type> NotificationTypes()
     {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
@@ -92,16 +95,12 @@ internal sealed class InProcessEventTransport(
                 continue;
             }
 
-            var match = types.FirstOrDefault(t =>
-                t is { IsClass: true, IsAbstract: false }
-                && typeof(INotification).IsAssignableFrom(t)
-                && string.Equals(t.Name, eventType, StringComparison.OrdinalIgnoreCase));
-
-            if (match is not null)
-                return match;
+            foreach (var type in types)
+            {
+                if (type is { IsClass: true, IsAbstract: false } && typeof(INotification).IsAssignableFrom(type))
+                    yield return type;
+            }
         }
-
-        return null;
     }
 }
 

@@ -1,0 +1,20 @@
+Match exception for bill {{BillNumber}} needs review
+
+Hi {{FirstName}},
+A three-way match exception needs your review.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+When: {{OccurredAt}}
+Reference: {{Reference}}
+
+Resolve match exception: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

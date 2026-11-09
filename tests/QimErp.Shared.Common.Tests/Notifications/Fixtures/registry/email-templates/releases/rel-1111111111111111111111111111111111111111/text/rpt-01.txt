@@ -1,0 +1,14 @@
+{{ScheduleName}}: {{ReportName}}
+
+Hi {{FirstName}},
+Your scheduled report is ready.
+
+Document: {{DocumentName}} ({{DocumentMeta}})
+
+View report run: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

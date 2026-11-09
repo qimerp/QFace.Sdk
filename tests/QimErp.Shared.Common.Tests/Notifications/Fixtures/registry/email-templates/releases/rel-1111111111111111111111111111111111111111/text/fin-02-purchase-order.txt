@@ -1,0 +1,19 @@
+Purchase order {{PoNumber}} from {{TenantName}}
+
+Hello,
+{{TenantName}} issued a new purchase order to you.
+
+Document: {{DocumentName}} ({{DocumentMeta}})
+
+Amount: {{Amount}}
+Approx. location: {{Location}}
+
+View purchase order: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} procurement team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

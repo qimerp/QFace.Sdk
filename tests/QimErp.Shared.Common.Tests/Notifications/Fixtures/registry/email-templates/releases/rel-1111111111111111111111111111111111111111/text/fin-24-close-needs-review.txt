@@ -1,0 +1,22 @@
+{{Period}} close needs review
+
+Hi {{FirstName}},
+The {{Period}} close has blockers.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+Due: {{DueDate}}
+Period: {{Period}}
+When: {{OccurredAt}}
+Count: {{Count}}
+
+Review close checklist: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -1,0 +1,22 @@
+Inventory exception {{Reference}} at {{WarehouseName}}
+
+Hi {{FirstName}},
+An inventory exception needs investigation.
+
+Warning · First observed {{FirstObservedAt}}
+Owner: {{Owner}}
+
+When: {{OccurredAt}}
+Warehouse: {{WarehouseName}}
+Reference: {{Reference}}
+Count: {{Count}}
+
+Review inventory exception: {{ActionUrl}}
+
+Runbook: {{Runbook}} · Dashboard: {{Dashboard}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

@@ -7,7 +7,7 @@ using QimErp.Shared.Common.TenantSetup;
 namespace QimErp.Shared.Common.Services.TenantSetup;
 
 public sealed class TenantPluginAccessService(
-    IDistributedCacheService cache,
+    ISharedDistributedCacheService cache,
     IHttpContextAccessor httpContextAccessor) : ITenantPluginAccessService
 {
     private static string SnapshotItemKey(Guid tenantId) => $"tenant-plugin-snapshot:{tenantId}";

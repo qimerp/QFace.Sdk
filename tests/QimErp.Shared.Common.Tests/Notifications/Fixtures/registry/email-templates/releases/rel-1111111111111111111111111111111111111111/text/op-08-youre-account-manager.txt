@@ -1,0 +1,16 @@
+You’re the account manager for {{TenantName}}
+
+Hi {{FirstName}},
+You're now the account manager for {{TenantName}}.
+
+Workspace: {{WorkspaceUrl}}
+Tenant: {{TenantName}}
+Plan: {{PlanName}}
+
+Open tenant profile: {{ActionUrl}}
+
+—
+You received this because you are on the QIM ERP operator team. Internal only; do not forward.
+Q-FACE Solutions Ltd · platform operations
+Help centre: https://qimerp.com/help
+Privacy: https://qimerp.com/privacy

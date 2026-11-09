@@ -40,7 +40,12 @@ public sealed class AppSettingsServiceMultiCompanyTests : IDisposable
     private sealed class TestAppSettingsService(TestDbContext context, IMemoryCache cache)
         : AppSettingsService<TestDbContext>(context, NullLogger<AppSettingsService<TestDbContext>>.Instance, cache)
     {
+        public bool ForceDatabaseUnavailable { get; set; }
+
         protected override DbSet<AppSetting> AppSettings => _context.AppSettings;
+
+        protected override bool CanConnectForCommittedRead() =>
+            !ForceDatabaseUnavailable && base.CanConnectForCommittedRead();
     }
 
     private sealed class Harness : IDisposable
@@ -289,5 +294,30 @@ public sealed class AppSettingsServiceMultiCompanyTests : IDisposable
         keys.Should().Contain(k => k.Contains(Tenant) && k.Contains(CompanyA));
         keys.Should().Contain(k => k.Contains(Tenant) && k.Contains(CompanyB));
         keys.Distinct().Should().HaveCount(2);
+    }
+
+    [Fact(DisplayName = "ReadCommittedSettingAsync throws when the database is unavailable instead of returning the default")]
+    public async Task ReadCommittedSettingAsync_WhenDatabaseUnavailable_Throws()
+    {
+        using var harness = new Harness();
+
+        SetScope(CompanyScope.ForCompanies([CompanyA], CompanyA));
+        harness.Service.ForceDatabaseUnavailable = true;
+
+        var act = async () => await harness.Service.ReadCommittedSettingAsync("currency.code", "fallback");
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*cannot read committed setting*");
+    }
+
+    [Fact(DisplayName = "ReadCommittedSettingAsync returns the stored value when the database is available")]
+    public async Task ReadCommittedSettingAsync_WhenAvailable_ReturnsStoredValue()
+    {
+        using var harness = new Harness();
+
+        SetScope(CompanyScope.ForCompanies([CompanyA], CompanyA));
+        await harness.Service.SetStringSettingAsync("currency.code", "GHS", "General", "desc");
+        harness.Cache.Compact(1.0);
+
+        (await harness.Service.ReadCommittedSettingAsync("currency.code", "fallback")).Should().Be("GHS");
     }
 }

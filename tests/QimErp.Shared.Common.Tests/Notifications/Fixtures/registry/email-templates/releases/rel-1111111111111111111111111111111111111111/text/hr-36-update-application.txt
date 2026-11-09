@@ -1,0 +1,18 @@
+Update on your application for {{RoleTitle}}
+
+Hello,
+There's an update on your application.
+
+Period: {{Period}}
+Stage: {{Stage}}
+Contact: {{Contact}}
+
+View update: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} recruitment team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

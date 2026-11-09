@@ -1,0 +1,12 @@
+Confirm receipt for asset transfer {{TransferNumber}}
+
+Hi {{FirstName}},
+An asset transfer is waiting for you to confirm receipt.
+
+Confirm asset receipt: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

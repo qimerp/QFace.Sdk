@@ -1,0 +1,16 @@
+{{ItemTitle}} exceeded its approval deadline
+
+Hi {{FirstName}},
+{{ItemTitle}} passed its approval deadline and has been escalated to you.
+
+Due: {{DueDate}}
+Stage: {{Stage}}
+When: {{OccurredAt}}
+
+Resolve escalation: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

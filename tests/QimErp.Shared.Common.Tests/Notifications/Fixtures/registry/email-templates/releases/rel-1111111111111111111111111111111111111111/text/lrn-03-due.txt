@@ -1,0 +1,16 @@
+{{CourseName}} is due {{Date}}
+
+Hi {{FirstName}},
+A required course is due soon.
+
+Due: {{DueDate}}
+When: {{OccurredAt}}
+Course: {{CourseName}}
+
+Resume course: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

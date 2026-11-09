@@ -1,0 +1,14 @@
+Reminder: leave request still needs your review
+
+Hi {{FirstName}},
+A leave request is still waiting for your review.
+
+Reference: {{Reference}}
+
+Review request: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

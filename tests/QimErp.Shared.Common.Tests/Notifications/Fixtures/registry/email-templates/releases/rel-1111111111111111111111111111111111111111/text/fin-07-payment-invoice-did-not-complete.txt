@@ -1,0 +1,21 @@
+Payment for invoice {{InvoiceNumber}} did not complete
+
+Hello,
+Your payment for invoice {{InvoiceNumber}} did not complete. You have not been charged.
+
+Outstanding balance: {{Amount}}
+{{AmountNote}}
+
+Invoice: {{InvoiceNumber}}
+Stage: {{Stage}}
+When: {{OccurredAt}}
+
+Return to invoice: {{ActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} accounts team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

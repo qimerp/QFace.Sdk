@@ -1,0 +1,18 @@
+A performance check-in is due {{Date}}
+
+Hi {{FirstName}},
+A performance check-in is due tomorrow.
+
+Workspace: {{WorkspaceUrl}}
+Due: {{DueDate}}
+When: {{OccurredAt}}
+
+For your privacy, the details are only shown after you sign in to QIM ERP.
+
+Open check-in: {{ActionUrl}}
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

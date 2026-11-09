@@ -1,0 +1,19 @@
+We received supplier invoice {{VendorInvoiceNumber}}
+
+Hello,
+We received your supplier invoice.
+
+Invoice: {{InvoiceNumber}}
+Reference: {{Reference}}
+
+View submission: {{ActionUrl}}
+
+Review bill: {{SecondaryActionUrl}}
+
+Questions about this? Reply to this email and the {{TenantName}} procurement team will help.
+
+—
+Sent by {{TenantName}} through QIM ERP. Questions? Reply to {{ReplyToEmail}}.
+{{TenantName}} · {{TenantAddress}} · TIN {{TenantTin}} · sent with QIM ERP
+View in browser: {{ViewInBrowserUrl}}
+Privacy: https://qimerp.com/privacy

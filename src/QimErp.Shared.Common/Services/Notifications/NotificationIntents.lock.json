@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "auth.password_reset.requested@1": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682",
+    "operator.account_manager.assigned@1": "0b422122570cfff73d5b768d15192e2100c1e2d0afdf2463a196c8475c05ca8e",
+    "workflow.approval.requested@1": "3be98cb078110858d66aff7b2e0272043f022f5fb0153143bbb416e1d785e4fb"
+  },
+  "revision": "062eadfe7f299f8cf10cbf86055b478d312bc1ff2e8f5619263f2b78e11f0609"
+}

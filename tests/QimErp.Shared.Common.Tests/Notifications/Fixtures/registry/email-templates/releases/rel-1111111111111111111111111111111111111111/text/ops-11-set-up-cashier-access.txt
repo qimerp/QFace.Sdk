@@ -1,0 +1,14 @@
+Set up your cashier access for {{StoreName}}
+
+Hi {{FirstName}},
+You've been added as a cashier. Set up your PIN to start selling.
+
+Enrol cashier PIN: {{ActionUrl}}
+
+This link works once and expires on {{LinkExpiresAt}}. If it has expired, ask your administrator to resend it.
+
+—
+You received this because you work at {{TenantName}} and use QIM ERP. Reply-to goes to your HR team.
+{{TenantName}} · sent with QIM ERP
+Notification preferences: {{Portal}}/settings/notifications
+Help centre: https://qimerp.com/help

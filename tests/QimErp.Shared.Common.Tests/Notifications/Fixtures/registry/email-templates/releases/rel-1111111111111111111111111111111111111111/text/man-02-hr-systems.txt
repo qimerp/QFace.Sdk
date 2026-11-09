@@ -1,0 +1,13 @@
+{{CompanyName}} — HR systems
+
+Hi {{FirstName}},
+I saw you’re hiring {{HiringRole}}. That usually means onboarding and leave tracking are getting harder to keep on top of.
+
+{{SenderName}} · QFace Solutions · {{SenderPhone}}
+
+—
+You received this because you asked to hear from QIM ERP. You can unsubscribe at any time.
+Q-FACE Solutions Ltd · Ridge, Accra, Ghana
+Unsubscribe: {{UnsubscribeUrl}}
+Manage preferences: {{PreferencesUrl}}
+Privacy: https://qimerp.com/privacy

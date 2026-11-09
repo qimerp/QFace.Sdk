@@ -1,0 +1,11 @@
+{
+  "action": "activate",
+  "generation": 1,
+  "highWater": 1,
+  "manifestKey": "email-templates/releases/rel-1111111111111111111111111111111111111111/manifest.json",
+  "manifestSha256": "ee2989b919aa7ee863d8804facaf610640933fe1b9590d029d8a2346a3a12406",
+  "priorReleaseId": null,
+  "releaseId": "rel-1111111111111111111111111111111111111111",
+  "schemaVersion": 1,
+  "sequence": 1
+}
