@@ -4,13 +4,22 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "374b00274fb61159e8e2af7183b3b60e19aac0006d2d9d4c6040d352eee7886d";
+    public const string ContractRevision = "062eadfe7f299f8cf10cbf86055b478d312bc1ff2e8f5619263f2b78e11f0609";
 
     public static class Auth
     {
         public static class PasswordResetRequested
         {
             public const string Key = "auth.password_reset.requested";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class Operator
+    {
+        public static class AccountManagerAssigned
+        {
+            public const string Key = "operator.account_manager.assigned";
             public const int V1 = 1;
         }
     }
