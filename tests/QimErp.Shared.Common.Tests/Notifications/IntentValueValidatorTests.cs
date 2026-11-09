@@ -15,6 +15,11 @@ public class IntentValueValidatorTests
     private static readonly IntentField ResetLink = Field("ActionUrl", IntentFieldType.Url, new IntentUrlRule("platform-frontend", "password_reset", "emailLinkLookupId", true));
     private static readonly IntentField ReviewLink = Field("ActionUrl", IntentFieldType.Url, new IntentUrlRule("platform-frontend", "approval_review", "approvalRequestId", false));
 
+    private const string ConsoleOrigin = "https://operator.qimerp.com";
+    private const string ProfileUrl = ConsoleOrigin + "/tenants/0190a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b";
+
+    private static readonly IntentField ProfileLink = Field("ActionUrl", IntentFieldType.Url, new IntentUrlRule("operator-console", "operator_tenant_profile", "subjectTenantId", false));
+
     private readonly IntentValueValidator _validator = new(Policy(Origin));
 
     [Fact]
@@ -112,6 +117,22 @@ public class IntentValueValidatorTests
         _validator.Validate(ResetLink, ResetUrl).Should().Be(IntentValueResult.Valid("ActionUrl", ResetUrl));
         _validator.Validate(ReviewLink, ReviewUrl).Should().Be(IntentValueResult.Valid("ActionUrl", ReviewUrl));
         _validator.Validate(ReviewLink, ResetUrl).Failure.Should().Be(IntentValueFailure.UrlPolicyViolation);
+    }
+
+    [Fact]
+    public void OperatorTenantProfileUrl_PassesAtConfiguredOrigin()
+    {
+        _validator.Validate(ProfileLink, ProfileUrl).Should().Be(IntentValueResult.Valid("ActionUrl", ProfileUrl));
+    }
+
+    [Theory]
+    [InlineData("https://other.qimerp.com/tenants/0190a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b")]
+    [InlineData("https://operator.qimerp.com:8443/tenants/0190a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b")]
+    [InlineData(ProfileUrl + "?x=1")]
+    [InlineData(ProfileUrl + "#frag")]
+    public void OperatorTenantProfileUrl_RejectsOtherHostPortQueryOrFragment(string url)
+    {
+        _validator.Validate(ProfileLink, url).Failure.Should().Be(IntentValueFailure.UrlPolicyViolation);
     }
 
     [Fact]
@@ -262,9 +283,11 @@ public class IntentValueValidatorTests
         new(name, type, true, IntentFieldSources.Platform, DataClassification.Internal, IntentResolutionPhase.Precheck, null, url);
 
     private static IntentUrlPolicy Policy(string origin) => new(
-        new Dictionary<string, Uri> { ["platform-frontend"] = new(origin) },
+        new Dictionary<string, Uri> { ["platform-frontend"] = new(origin), ["operator-console"] = new(ConsoleOrigin) },
         new Dictionary<string, Func<Uri, bool>>
         {
+            ["operator_tenant_profile"] = uri => System.Text.RegularExpressions.Regex.IsMatch(uri.AbsolutePath, @"^/tenants/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z")
+                && uri.Query.Length == 0,
             ["password_reset"] = uri => uri.AbsolutePath == "/auth/reset-password"
                 && System.Text.RegularExpressions.Regex.IsMatch(uri.Query, @"^\?token=[A-Za-z0-9_-]{43}\z"),
             ["approval_review"] = uri => System.Text.RegularExpressions.Regex.IsMatch(uri.AbsolutePath, @"^/[a-z0-9-]+/workflows/review/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z")

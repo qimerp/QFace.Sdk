@@ -3,7 +3,7 @@
   "generation": 1,
   "highWater": 1,
   "manifestKey": "email-templates/releases/rel-1111111111111111111111111111111111111111/manifest.json",
-  "manifestSha256": "735824742a70750d796b7ec20d8095383be6bed2140164ecb8a096e15e11f194",
+  "manifestSha256": "ee2989b919aa7ee863d8804facaf610640933fe1b9590d029d8a2346a3a12406",
   "priorReleaseId": null,
   "releaseId": "rel-1111111111111111111111111111111111111111",
   "schemaVersion": 1,
