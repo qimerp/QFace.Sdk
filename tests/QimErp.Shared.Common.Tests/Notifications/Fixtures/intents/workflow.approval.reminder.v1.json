@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "key": "workflow.approval.reminder",
+  "version": 1,
+  "owner": {
+    "domain": "workflow",
+    "service": "QimErp.Platform"
+  },
+  "summary": "A manual or scheduled reminder for the current pending assigned approver.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "assigned_approver",
+      "recipient": {
+        "source": "platform",
+        "from": "approverUserId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "approverUserId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    },
+    {
+      "name": "approvalRequestId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "ItemTitle",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Confidential",
+      "resolvedAt": "precheck",
+      "example": "Example request title"
+    },
+    {
+      "name": "Stage",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "2 of 3"
+    },
+    {
+      "name": "DueDate",
+      "type": "datetime",
+      "required": false,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "2026-11-14T17:00:00Z"
+    },
+    {
+      "name": "OccurredAt",
+      "type": "datetime",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "2026-11-07T09:42:00Z"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://app.example.qimerp.com/example/workflows/review/00000000-0000-0000-0000-000000000001",
+      "resolvedFrom": "approval.reviewUrl",
+      "url": {
+        "host": "platform-frontend",
+        "purpose": "approval_review",
+        "reference": "approvalRequestId"
+      }
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "WorkspaceUrl",
+      "type": "hostname",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "workspace.example.qimerp.com",
+      "resolvedFrom": "tenant.workspaceHost"
+    }
+  ]
+}

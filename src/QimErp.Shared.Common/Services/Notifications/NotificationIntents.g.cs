@@ -4,7 +4,7 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "062eadfe7f299f8cf10cbf86055b478d312bc1ff2e8f5619263f2b78e11f0609";
+    public const string ContractRevision = "32cefcda6dd99a1f156f3e4c8520c7ce2e887351e340e8656f9241cfe419b661";
 
     public static class Auth
     {
@@ -26,6 +26,11 @@ public static class NotificationIntents
 
     public static class Workflow
     {
+        public static class ApprovalReminder
+        {
+            public const string Key = "workflow.approval.reminder";
+            public const int V1 = 1;
+        }
         public static class ApprovalRequested
         {
             public const string Key = "workflow.approval.requested";
