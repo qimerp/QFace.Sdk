@@ -41,11 +41,12 @@ public sealed class TemporalOptions
     public string? ApiKey { get; set; }
 
     /// <summary>
-    /// Enable TLS for the Temporal connection.
-    /// Automatically set to true when Address is non-localhost and EnableTls is not
-    /// explicitly configured — see TemporalClientServiceCollectionExtensions.
+    /// TLS for the Temporal connection.
+    /// null = auto (TLS on for Temporal Cloud / non-localhost / when ApiKey is set);
+    /// true/false = explicit override.
+    /// When false with an ApiKey, the key is sent as Bearer metadata (plaintext gRPC).
     /// </summary>
-    public bool EnableTls { get; set; } = false;
+    public bool? EnableTls { get; set; }
 
     /// <summary>
     /// Advanced TLS settings (custom CA, SNI domain, mTLS certs).

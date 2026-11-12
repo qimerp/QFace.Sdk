@@ -17,6 +17,9 @@ public class IntentTemplateRendererTests
     [InlineData(NotificationFixtures.ApprovalCode, NotificationFixtures.ApprovalKey, NotificationFixtures.ApprovalAudience, "full")]
     [InlineData(NotificationFixtures.ApprovalCode, NotificationFixtures.ApprovalKey, NotificationFixtures.ApprovalAudience, "minimal")]
     [InlineData(NotificationFixtures.ApprovalCode, NotificationFixtures.ApprovalKey, NotificationFixtures.ApprovalAudience, "precheck")]
+    [InlineData(NotificationFixtures.OperatorCode, NotificationFixtures.OperatorKey, NotificationFixtures.OperatorAudience, "full")]
+    [InlineData(NotificationFixtures.OperatorCode, NotificationFixtures.OperatorKey, NotificationFixtures.OperatorAudience, "minimal")]
+    [InlineData(NotificationFixtures.OperatorCode, NotificationFixtures.OperatorKey, NotificationFixtures.OperatorAudience, "precheck")]
     public async Task Render_IsByteEqualToStage2Fixtures(string code, string key, string audience, string variant)
     {
         var pinned = await NotificationFixtures.PinnedAsync(code, key, audience);
@@ -28,7 +31,7 @@ public class IntentTemplateRendererTests
         var stem = $"{code}.{key}.v1.{audience}.{variant}";
         Encoding.UTF8.GetBytes(result.Email!.Html).Should().Equal(File.ReadAllBytes(NotificationFixtures.PreviewPath(stem + ".html")));
         Encoding.UTF8.GetBytes(result.Email.Text).Should().Equal(File.ReadAllBytes(NotificationFixtures.PreviewPath(stem + ".txt")));
-        result.Email.Subject.Should().Be(pinned.Template.Subject);
+        result.Email.Subject.Should().Be(values.Aggregate(pinned.Template.Subject, (subject, v) => subject.Replace("{{" + v.Key + "}}", v.Value, StringComparison.Ordinal)));
         result.Email.SenderAddress.Should().Be("no-reply@qimerp.com");
     }
 
@@ -182,6 +185,19 @@ public class IntentTemplateRendererTests
         Tokens(result.Email!.Html).Should().BeEquivalentTo(["ActionUrl", "LinkExpiresAt"]);
         Tokens(result.Email.Text).Should().BeEquivalentTo(["ActionUrl", "LinkExpiresAt"]);
         result.Email.Html.Should().NotContain(values["ActionUrl"]);
+    }
+
+    [Fact]
+    public async Task OperatorPrecheck_LeavesNoResidue()
+    {
+        var pinned = await NotificationFixtures.PinnedAsync(NotificationFixtures.OperatorCode, NotificationFixtures.OperatorKey, NotificationFixtures.OperatorAudience);
+        var values = NotificationFixtures.ExampleValues(pinned.Contract, NotificationFixtures.OperatorKey);
+
+        var result = _renderer.RenderPrecheck(pinned, values);
+
+        result.Failure.Should().Be(RenderFailure.None);
+        Tokens(result.Email!.Html).Should().BeEmpty();
+        Tokens(result.Email.Text).Should().BeEmpty();
     }
 
     [Fact]

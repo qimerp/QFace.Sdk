@@ -17,12 +17,18 @@
       "url": "https://email-cdn.qimerp.com/email/qim-erp-logomark.png"
     }
   ],
-  "contractRevision": "374b00274fb61159e8e2af7183b3b60e19aac0006d2d9d4c6040d352eee7886d",
+  "contractRevision": "062eadfe7f299f8cf10cbf86055b478d312bc1ff2e8f5619263f2b78e11f0609",
   "contracts": [
     {
       "key": "auth.password_reset.requested",
       "object": "email-templates/releases/rel-1111111111111111111111111111111111111111/intents/auth.password_reset.requested.v1.json",
       "sha256": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682",
+      "version": 1
+    },
+    {
+      "key": "operator.account_manager.assigned",
+      "object": "email-templates/releases/rel-1111111111111111111111111111111111111111/intents/operator.account_manager.assigned.v1.json",
+      "sha256": "0b422122570cfff73d5b768d15192e2100c1e2d0afdf2463a196c8475c05ca8e",
       "version": 1
     },
     {
@@ -39,6 +45,13 @@
       "length": 2185,
       "path": "intents/auth.password_reset.requested.v1.json",
       "sha256": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682"
+    },
+    {
+      "contentType": "application/json",
+      "key": "email-templates/releases/rel-1111111111111111111111111111111111111111/intents/operator.account_manager.assigned.v1.json",
+      "length": 2255,
+      "path": "intents/operator.account_manager.assigned.v1.json",
+      "sha256": "0b422122570cfff73d5b768d15192e2100c1e2d0afdf2463a196c8475c05ca8e"
     },
     {
       "contentType": "application/json",
@@ -624,9 +637,9 @@
     {
       "contentType": "text/html; charset=utf-8",
       "key": "email-templates/releases/rel-1111111111111111111111111111111111111111/templates/op-08-youre-account-manager.html",
-      "length": 10468,
+      "length": 10313,
       "path": "templates/op-08-youre-account-manager.html",
-      "sha256": "7063ac851bba85d3cfa218ed7ca16f04e93345748511eb018381c6ee0a8497f1"
+      "sha256": "34a072dfe99e379b7dbcbdb8f2b0753d8891a0f88055da786731bc9b853ae77c"
     },
     {
       "contentType": "text/html; charset=utf-8",
@@ -1793,9 +1806,9 @@
     {
       "contentType": "text/plain; charset=utf-8",
       "key": "email-templates/releases/rel-1111111111111111111111111111111111111111/text/op-08-youre-account-manager.txt",
-      "length": 510,
+      "length": 442,
       "path": "text/op-08-youre-account-manager.txt",
-      "sha256": "6ae9a56bbe02af931a934db855a28f60f8f1c2f453739e03cdf6277dc969abfd"
+      "sha256": "fb73d494cd2ac084e13c901dda427bc9f6c9958489c6c1e047d99b9580410a74"
     },
     {
       "contentType": "text/plain; charset=utf-8",
@@ -3456,7 +3469,53 @@
       "code": "op-08-youre-account-manager",
       "html": "email-templates/releases/rel-1111111111111111111111111111111111111111/templates/op-08-youre-account-manager.html",
       "id": "OP-08",
-      "intents": [],
+      "intents": [
+        {
+          "audience": "account_manager",
+          "fallbacks": {
+            "FirstName": "there"
+          },
+          "fields": {
+            "infra": [],
+            "platformAfterPrecheck": [],
+            "platformPrecheck": [
+              "ActionUrl",
+              "FirstName",
+              "PlanName",
+              "TenantName",
+              "WorkspaceUrl"
+            ],
+            "producer": []
+          },
+          "key": "operator.account_manager.assigned",
+          "placeholderContexts": {
+            "ActionUrl": [
+              "htmlHref",
+              "textUrl"
+            ],
+            "FirstName": [
+              "htmlText",
+              "text"
+            ],
+            "PlanName": [
+              "htmlText",
+              "text"
+            ],
+            "TenantName": [
+              "htmlAriaLabel",
+              "htmlText",
+              "htmlTitle",
+              "subject",
+              "text"
+            ],
+            "WorkspaceUrl": [
+              "htmlText",
+              "text"
+            ]
+          },
+          "version": 1
+        }
+      ],
       "preheader": "View the decision and next steps.",
       "sender": {
         "address": "no-reply@qimerp.com",
