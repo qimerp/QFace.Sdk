@@ -73,78 +73,7 @@ public static class TemporalClientServiceCollectionExtensions
             var opts   = optionsFactory(sp);
             var logger = sp.GetRequiredService<ILogger<ITemporalClient>>();
 
-            // Prefer config; fall back to TEMPORAL_* env vars (Temporal Cloud convention).
-            var address = (opts.Address ?? Environment.GetEnvironmentVariable("TEMPORAL_ADDRESS") ?? "localhost:7233").Trim();
-            var @namespace = (opts.Namespace ?? Environment.GetEnvironmentVariable("TEMPORAL_NAMESPACE") ?? "default").Trim();
-            var apiKey = !string.IsNullOrWhiteSpace(opts.ApiKey)
-                ? opts.ApiKey.Trim()
-                : Environment.GetEnvironmentVariable("TEMPORAL_API_KEY")?.Trim();
-
-            // Explicit EnableTls wins. Otherwise auto for Temporal Cloud (API key / non-local).
-            var useTls = opts.EnableTls
-                ?? (!string.IsNullOrEmpty(apiKey) || !TemporalNaming.IsLocalAddress(address));
-
-            logger.LogInformation(
-                "[QFace.Sdk.Temporal] Connecting. Address={Address}, Namespace={Namespace}, TLS={UseTls}, ApiKey={HasApiKey}",
-                address, @namespace, useTls, !string.IsNullOrEmpty(apiKey));
-
-            var connectOptions = new TemporalClientConnectOptions
-            {
-                TargetHost = address,
-                Namespace  = @namespace
-            };
-
-            if (!string.IsNullOrEmpty(apiKey))
-            {
-                if (useTls)
-                {
-                    connectOptions.ApiKey = apiKey;
-                }
-                else
-                {
-                    connectOptions.RpcMetadata = new Dictionary<string, string>
-                    {
-                        ["authorization"] = $"Bearer {apiKey}"
-                    };
-                }
-            }
-
-            if (useTls)
-            {
-                var tlsOptions = new TlsOptions();
-
-                if (opts.Tls != null)
-                {
-                    // Custom CA certificate
-                    if (!string.IsNullOrWhiteSpace(opts.Tls.ServerRootCaCert))
-                        tlsOptions.ServerRootCACert =
-                            System.Text.Encoding.UTF8.GetBytes(opts.Tls.ServerRootCaCert);
-
-                    // SNI domain override — default to host from address
-                    tlsOptions.Domain = !string.IsNullOrWhiteSpace(opts.Tls.Domain)
-                        ? opts.Tls.Domain
-                        : TemporalNaming.ExtractHost(address);
-
-                    // mTLS client certificate
-                    if (!string.IsNullOrWhiteSpace(opts.Tls.ClientCert) &&
-                        !string.IsNullOrWhiteSpace(opts.Tls.ClientPrivateKey))
-                    {
-                        tlsOptions.ClientCert =
-                            System.Text.Encoding.UTF8.GetBytes(opts.Tls.ClientCert);
-                        tlsOptions.ClientPrivateKey =
-                            System.Text.Encoding.UTF8.GetBytes(opts.Tls.ClientPrivateKey);
-                    }
-                }
-                else
-                {
-                    // Default TLS — system CA, SNI from address host
-                    tlsOptions.Domain = TemporalNaming.ExtractHost(address);
-                }
-
-                connectOptions.Tls = tlsOptions;
-            }
-
-            return TemporalClient.ConnectAsync(connectOptions).GetAwaiter().GetResult();
+            return TemporalClient.ConnectAsync(BuildConnectOptions(opts, logger)).GetAwaiter().GetResult();
         });
 
         // Generic workflow operation abstractions
@@ -172,5 +101,81 @@ public static class TemporalClientServiceCollectionExtensions
             });
 
         return services;
+    }
+
+    internal static TemporalClientConnectOptions BuildConnectOptions(TemporalOptions opts, ILogger logger)
+    {
+        // Prefer config; fall back to TEMPORAL_* env vars (Temporal Cloud convention).
+        var address = (opts.Address ?? Environment.GetEnvironmentVariable("TEMPORAL_ADDRESS") ?? "localhost:7233").Trim();
+        var @namespace = (opts.Namespace ?? Environment.GetEnvironmentVariable("TEMPORAL_NAMESPACE") ?? "default").Trim();
+        var apiKey = !string.IsNullOrWhiteSpace(opts.ApiKey)
+            ? opts.ApiKey.Trim()
+            : Environment.GetEnvironmentVariable("TEMPORAL_API_KEY")?.Trim();
+
+        // Explicit EnableTls wins. Otherwise auto for Temporal Cloud (API key / non-local).
+        var useTls = opts.EnableTls
+            ?? (!string.IsNullOrEmpty(apiKey) || !TemporalNaming.IsLocalAddress(address));
+
+        logger.LogInformation(
+            "[QFace.Sdk.Temporal] Connecting. Address={Address}, Namespace={Namespace}, TLS={UseTls}, ApiKey={HasApiKey}",
+            address, @namespace, useTls, !string.IsNullOrEmpty(apiKey));
+
+        var connectOptions = new TemporalClientConnectOptions
+        {
+            TargetHost = address,
+            Namespace  = @namespace
+        };
+
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            if (useTls)
+            {
+                connectOptions.ApiKey = apiKey;
+            }
+            else
+            {
+                connectOptions.RpcMetadata = new Dictionary<string, string>
+                {
+                    ["authorization"] = $"Bearer {apiKey}"
+                };
+            }
+        }
+
+        if (useTls)
+        {
+            var tlsOptions = new TlsOptions();
+
+            if (opts.Tls != null)
+            {
+                // Custom CA certificate
+                if (!string.IsNullOrWhiteSpace(opts.Tls.ServerRootCaCert))
+                    tlsOptions.ServerRootCACert =
+                        System.Text.Encoding.UTF8.GetBytes(opts.Tls.ServerRootCaCert);
+
+                // SNI domain override — default to host from address
+                tlsOptions.Domain = !string.IsNullOrWhiteSpace(opts.Tls.Domain)
+                    ? opts.Tls.Domain
+                    : TemporalNaming.ExtractHost(address);
+
+                // mTLS client certificate
+                if (!string.IsNullOrWhiteSpace(opts.Tls.ClientCert) &&
+                    !string.IsNullOrWhiteSpace(opts.Tls.ClientPrivateKey))
+                {
+                    tlsOptions.ClientCert =
+                        System.Text.Encoding.UTF8.GetBytes(opts.Tls.ClientCert);
+                    tlsOptions.ClientPrivateKey =
+                        System.Text.Encoding.UTF8.GetBytes(opts.Tls.ClientPrivateKey);
+                }
+            }
+            else
+            {
+                // Default TLS — system CA, SNI from address host
+                tlsOptions.Domain = TemporalNaming.ExtractHost(address);
+            }
+
+            connectOptions.Tls = tlsOptions;
+        }
+
+        return connectOptions;
     }
 }
