@@ -18,7 +18,7 @@ public enum RenderFailure
     InvalidBrandValue,
 }
 
-/// <summary>Colours are <c>#RRGGBB</c> upper-case; an invalid colour falls back to the manifest default. A null <paramref name="Link"/> follows a valid <paramref name="Accent"/>.</summary>
+/// <summary>Colours are <c>#RRGGBB</c> upper-case; an invalid colour falls back to the manifest default. A null or blank <paramref name="Link"/> follows a valid <paramref name="Accent"/>.</summary>
 public sealed record BrandValues(string? Band, string? Accent, string? Link, string? LogoUrl);
 
 public sealed record RenderedEmail(string Subject, string Preheader, string Html, string Text, string SenderName, string SenderAddress);
@@ -74,11 +74,9 @@ public sealed class IntentTemplateRenderer
         _allowedSender = allowedSender ?? throw new ArgumentNullException(nameof(allowedSender));
     }
 
-    /// <summary><paramref name="brand"/> is used only when the declaration lists brand infra tokens; null renders the manifest defaults.</summary>
     public RenderResult RenderPrecheck(PinnedTemplate t, IReadOnlyDictionary<string, string> values, BrandValues? brand = null) =>
         Render(t, values, brand, final: false);
 
-    /// <summary><paramref name="brand"/> is used only when the declaration lists brand infra tokens; null renders the manifest defaults.</summary>
     public RenderResult RenderFinal(PinnedTemplate t, IReadOnlyDictionary<string, string> values, BrandValues? brand = null) =>
         Render(t, values, brand, final: true);
 
@@ -90,6 +88,10 @@ public sealed class IntentTemplateRenderer
         var template = t.Template;
         var declaration = t.Declaration;
         var fields = t.Contract.Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
+
+        var brandNamedFields = fields.Keys.Where(BrandContexts.ContainsKey).ToList();
+        if (brandNamedFields.Count > 0)
+            return RenderResult.Fail(RenderFailure.UnknownPlaceholder, brandNamedFields);
 
         var infra = declaration.Fields.Infra;
         if (infra.Count > 0
@@ -120,10 +122,12 @@ public sealed class IntentTemplateRenderer
         if (contextViolations.Count > 0)
             return RenderResult.Fail(RenderFailure.ContextViolation, contextViolations);
 
+        var placements = HtmlLinkScanner.ScanPlacements(t.Html);
         var brandResolved = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (brandUsed.Count > 0)
+        var brandAt = new Dictionary<int, string>();
+        if (infra.Count > 0)
         {
-            var brandViolations = BrandContextViolations(t, headers, brandUsed);
+            var brandViolations = BrandContextViolations(t, headers, brandUsed, placements, brandAt);
             if (brandViolations.Count > 0)
                 return RenderResult.Fail(RenderFailure.ContextViolation, brandViolations);
 
@@ -141,6 +145,15 @@ public sealed class IntentTemplateRenderer
         var missingLinks = MissingRequiredLinks(t);
         if (missingLinks.Count > 0)
             return RenderResult.Fail(RenderFailure.RequiredLinkMissing, missingLinks);
+
+        if (placements is null)
+            return RenderResult.Fail(RenderFailure.ContextViolation, TokenNames(t.Html));
+        var typedAttributeViolations = placements.SensitiveAttributeTokens
+            .Where(s => !brandAt.TryGetValue(s.Offset, out var name) || name != s.Name)
+            .Select(s => s.Name)
+            .ToList();
+        if (typedAttributeViolations.Count > 0)
+            return RenderResult.Fail(RenderFailure.ContextViolation, typedAttributeViolations);
 
         var missing = t.Contract.Fields
             .Where(f => f.Required && IsResolved(f, final) && !HasValue(values, f.Name))
@@ -192,7 +205,10 @@ public sealed class IntentTemplateRenderer
         var htmlResolved = brandResolved.Count == 0
             ? resolved
             : resolved.Concat(brandResolved).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
-        var html = Substitute(t.Html, htmlResolved, html: true);
+        var html = Token.Replace(t.Html, match =>
+            brandAt.TryGetValue(match.Index, out var brandName) && brandName == match.Groups[1].Value
+                ? EscapeHtml(brandResolved[brandName])
+                : resolved.TryGetValue(match.Groups[1].Value, out var value) ? EscapeHtml(value) : match.Value);
         var text = Substitute(t.Text, resolved, html: false);
 
         var residue = Residue(t.Html, html, htmlResolved, final).Concat(Residue(t.Text, text, resolved, final)).ToList();
@@ -259,28 +275,40 @@ public sealed class IntentTemplateRenderer
             .ToList();
     }
 
-    private static List<string> BrandContextViolations(PinnedTemplate t, IEnumerable<string> headers, IReadOnlySet<string> brandUsed)
+    private static List<string> BrandContextViolations(
+        PinnedTemplate t, IEnumerable<string> headers, IReadOnlySet<string> brandUsed, HtmlPlacements? scan, Dictionary<int, string> brandAt)
     {
         var violations = headers.Append(t.Text).SelectMany(TokenNames).Where(brandUsed.Contains).ToHashSet(StringComparer.Ordinal);
-
-        var placements = HtmlLinkScanner.Scan(t.Html)?.TypedPlacements;
-        var occurrences = TokenNames(t.Html).Where(brandUsed.Contains).GroupBy(n => n, StringComparer.Ordinal);
-        foreach (var occurrence in occurrences)
+        if (scan is null)
         {
-            var name = occurrence.Key;
-            if (placements is null
-                || !t.Declaration.PlaceholderContexts.TryGetValue(name, out var declared) || declared.Count == 0
-                || declared.Any(c => !BrandContexts[name].Contains(c, StringComparer.Ordinal)))
-            {
-                violations.Add(name);
-                continue;
-            }
+            violations.UnionWith(brandUsed);
+            return violations.ToList();
+        }
 
-            var placed = placements.Where(p => string.Equals(p.Name, name, StringComparison.Ordinal)).ToList();
-            if (placed.Count != occurrence.Count() || placed.Any(p => !declared.Contains(p.Context, StringComparer.Ordinal)))
+        foreach (var (start, end) in scan.CommentTaggedSpans)
+            violations.UnionWith(BrandContexts.Keys.Where(name => t.Html.AsSpan(start, end - start).Contains(name, StringComparison.Ordinal)));
+
+        var unmatched = new Dictionary<int, TypedPlacement>();
+        foreach (var placement in scan.Placements.Where(p => BrandContexts.ContainsKey(p.Name)))
+            unmatched.TryAdd(placement.Offset, placement);
+
+        foreach (Match match in Token.Matches(t.Html))
+        {
+            var name = match.Groups[1].Value;
+            if (!brandUsed.Contains(name))
+                continue;
+
+            if (unmatched.Remove(match.Index, out var placement)
+                && placement.Name == name
+                && t.Declaration.PlaceholderContexts.TryGetValue(name, out var declared) && declared.Count > 0
+                && declared.All(c => BrandContexts[name].Contains(c, StringComparer.Ordinal))
+                && declared.Contains(placement.Context, StringComparer.Ordinal))
+                brandAt[match.Index] = name;
+            else
                 violations.Add(name);
         }
 
+        violations.UnionWith(unmatched.Values.Select(p => p.Name));
         return violations.ToList();
     }
 
@@ -300,7 +328,7 @@ public sealed class IntentTemplateRenderer
         {
             [BrandBand] = Colour(BrandBand, brand?.Band),
             [BrandAccent] = Colour(BrandAccent, brand?.Accent),
-            [BrandLink] = brand?.Link is null && accentSupplied ? brand!.Accent : Colour(BrandLink, brand?.Link),
+            [BrandLink] = string.IsNullOrWhiteSpace(brand?.Link) && accentSupplied ? brand!.Accent : Colour(BrandLink, brand?.Link),
         };
 
         foreach (var name in brandUsed)
@@ -332,7 +360,8 @@ public sealed class IntentTemplateRenderer
 
     private static bool ContextsAllowed(IntentField field, ManifestIntentDeclaration declaration)
     {
-        if (!declaration.PlaceholderContexts.TryGetValue(field.Name, out var contexts) || contexts.Count == 0)
+        if (!declaration.PlaceholderContexts.TryGetValue(field.Name, out var contexts) || contexts.Count == 0
+            || contexts.Any(c => c is HtmlLinkScanner.CssColor or HtmlLinkScanner.AttrColor or HtmlLinkScanner.ImgSrc))
             return false;
 
         return field.Type == IntentFieldType.Url

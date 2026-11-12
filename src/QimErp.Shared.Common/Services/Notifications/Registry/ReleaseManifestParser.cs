@@ -12,6 +12,8 @@ internal static class ReleaseManifestParser
 
     public static readonly string[] BrandColourTokens = ["BrandBand", "BrandAccent", "BrandLink"];
 
+    private const string TemplateHtmlContentType = "text/html; charset=utf-8";
+
     private static readonly string[] PointerProperties =
     [
         "schemaVersion", "releaseId", "manifestKey", "manifestSha256", "sequence", "generation", "highWater", "action", "priorReleaseId",
@@ -121,7 +123,7 @@ internal static class ReleaseManifestParser
                 || !TryGet(entry, "text", out var textElement) || !TryString(textElement, out var text) || !RegistryKey.IsValid(text))
                 return null;
 
-            var template = ParseTemplate(entry, code, html, text, schemaVersion, objects);
+            var template = ParseTemplate(entry, code, html, text, schemaVersion, objects, releasePrefix);
             if (template is null)
                 malformed.Add(code);
             else
@@ -148,7 +150,7 @@ internal static class ReleaseManifestParser
     public static bool IsLogoHost(string? value) => value is not null && value.Length <= 253 && LowerHostname.IsMatch(value);
 
     private static ManifestTemplate? ParseTemplate(
-        JsonElement entry, string code, string html, string text, long schemaVersion, IReadOnlyList<ManifestObject> objects)
+        JsonElement entry, string code, string html, string text, long schemaVersion, IReadOnlyList<ManifestObject> objects, string releasePrefix)
     {
         if (!TryGet(entry, "id", out var idElement) || !TryString(idElement, out var id)
             || !TryGet(entry, "subject", out var subjectElement) || !TryString(subjectElement, out var subject)
@@ -171,7 +173,7 @@ internal static class ReleaseManifestParser
         ManifestBranding? branding = null;
         if (schemaVersion >= 2 && TryGet(entry, "branding", out var brandingElement))
         {
-            branding = ParseBranding(brandingElement, objects);
+            branding = ParseBranding(brandingElement, objects, releasePrefix + "templates/" + code + ".logo.html", html, text);
             if (branding is null)
                 return null;
         }
@@ -182,7 +184,8 @@ internal static class ReleaseManifestParser
         };
     }
 
-    private static ManifestBranding? ParseBranding(JsonElement entry, IReadOnlyList<ManifestObject> objects)
+    private static ManifestBranding? ParseBranding(
+        JsonElement entry, IReadOnlyList<ManifestObject> objects, string logoHtmlKey, string htmlKey, string textKey)
     {
         if (!StrictJson.HasExactProperties(entry, "audiences", "tokens", "logoHost", "variants")
             || !TryString(entry.GetProperty("logoHost"), out var logoHost) || !IsLogoHost(logoHost))
@@ -212,8 +215,11 @@ internal static class ReleaseManifestParser
         foreach (var variant in variantsElement.EnumerateObject())
         {
             if (!StrictJson.HasExactProperties(variant.Value, "html")
-                || !TryString(variant.Value.GetProperty("html"), out var variantHtml) || !RegistryKey.IsValid(variantHtml)
-                || !objects.Any(o => string.Equals(o.Key, variantHtml, StringComparison.Ordinal)))
+                || !TryString(variant.Value.GetProperty("html"), out var variantHtml)
+                || !string.Equals(variantHtml, logoHtmlKey, StringComparison.Ordinal)
+                || string.Equals(variantHtml, htmlKey, StringComparison.Ordinal) || string.Equals(variantHtml, textKey, StringComparison.Ordinal)
+                || !objects.Any(o => string.Equals(o.Key, variantHtml, StringComparison.Ordinal)
+                                     && string.Equals(o.ContentType, TemplateHtmlContentType, StringComparison.Ordinal)))
                 return null;
             variants[variant.Name] = new ManifestTemplateVariant(variantHtml);
         }
