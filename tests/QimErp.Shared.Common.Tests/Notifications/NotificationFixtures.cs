@@ -18,7 +18,11 @@ internal static class NotificationFixtures
     public const string ApprovalCode = "wf-02-approval-needed";
     public const string ApprovalKey = "workflow.approval.requested";
     public const string ApprovalAudience = "assigned_approver";
+    public const string OperatorCode = "op-08-youre-account-manager";
+    public const string OperatorKey = "operator.account_manager.assigned";
+    public const string OperatorAudience = "account_manager";
     public const string ExampleOrigin = "https://app.example.qimerp.com";
+    public const string ExampleOperatorOrigin = "https://operator.example.qimerp.com";
 
     public static readonly ManifestSender AllowedSender = new("QIM ERP", "no-reply@qimerp.com");
 
@@ -52,11 +56,12 @@ internal static class NotificationFixtures
     }
 
     public static IntentUrlPolicy ExamplePolicy() => new(
-        new Dictionary<string, Uri> { ["platform-frontend"] = new(ExampleOrigin) },
+        new Dictionary<string, Uri> { ["platform-frontend"] = new(ExampleOrigin), ["operator-console"] = new(ExampleOperatorOrigin) },
         new Dictionary<string, Func<Uri, bool>>
         {
             ["password_reset"] = uri => uri.AbsolutePath == "/reset-password" && Regex.IsMatch(uri.Query, @"^\?token=[A-Za-z0-9_-]+\z"),
             ["approval_review"] = uri => Regex.IsMatch(uri.AbsolutePath, @"^/workflow/entity/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/review\z") && uri.Query.Length == 0,
+            ["operator_tenant_profile"] = uri => Regex.IsMatch(uri.AbsolutePath, @"^/tenants/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z") && uri.Query.Length == 0,
         });
 
     public static IReadOnlyDictionary<string, string> ExampleValues(IntentContract contract, string key, bool requiredOnly = false)

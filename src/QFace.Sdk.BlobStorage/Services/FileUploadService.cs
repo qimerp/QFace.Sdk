@@ -172,6 +172,9 @@ public class FileUploadService : IFileUploadService
             // Log the original file key
             _logger.LogInformation("Original file key: {FileKey}", s3Key);
 
+            // R2 rejects SigV2; force V4 immediately before signing (custom ServiceURL endpoints).
+            Amazon.AWSConfigsS3.UseSignatureVersion4 = true;
+
             var request = new GetPreSignedUrlRequest
             {
                 BucketName = _bucketName,
