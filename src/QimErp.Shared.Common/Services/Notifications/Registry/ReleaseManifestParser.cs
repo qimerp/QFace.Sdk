@@ -6,6 +6,11 @@ internal static class ReleaseManifestParser
     private static readonly Regex Commit = new(@"^(?:[0-9a-f]{40}|[0-9a-f]{64})\z", RegexOptions.CultureInvariant);
     private static readonly Regex TemplateCode = new(@"^[a-z0-9]+(?:-[a-z0-9]+)*\z", RegexOptions.CultureInvariant);
     private static readonly Regex IntentKey = new(@"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){2}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex BrandColour = new(@"^#[0-9A-F]{6}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex LowerHostname = new(
+        @"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\z", RegexOptions.CultureInvariant);
+
+    public static readonly string[] BrandColourTokens = ["BrandBand", "BrandAccent", "BrandLink"];
 
     private static readonly string[] PointerProperties =
     [
@@ -46,7 +51,7 @@ internal static class ReleaseManifestParser
         if (!StrictJson.TryParse(body, out var root) || root.ValueKind != JsonValueKind.Object)
             return null;
 
-        if (!TryGet(root, "schemaVersion", out var schemaElement) || !TryInt(schemaElement, out var schemaVersion) || schemaVersion != 1
+        if (!TryGet(root, "schemaVersion", out var schemaElement) || !TryInt(schemaElement, out var schemaVersion) || schemaVersion is not (1 or 2)
             || !TryGet(root, "releaseId", out var releaseElement) || !TryString(releaseElement, out var manifestReleaseId) || manifestReleaseId != releaseId
             || !TryGet(root, "sequence", out var sequenceElement) || !TryInt(sequenceElement, out var sequence) || sequence <= 0)
             return null;
@@ -116,7 +121,7 @@ internal static class ReleaseManifestParser
                 || !TryGet(entry, "text", out var textElement) || !TryString(textElement, out var text) || !RegistryKey.IsValid(text))
                 return null;
 
-            var template = ParseTemplate(entry, code, html, text);
+            var template = ParseTemplate(entry, code, html, text, schemaVersion, objects);
             if (template is null)
                 malformed.Add(code);
             else
@@ -131,14 +136,19 @@ internal static class ReleaseManifestParser
             partials.Add(partial);
         }
 
-        return new ReleaseManifest(1, releaseId, sequence, new ManifestSource(commit, committedAt), contractRevision,
+        return new ReleaseManifest((int)schemaVersion, releaseId, sequence, new ManifestSource(commit, committedAt), contractRevision,
             objects, assets, contracts, templates, partials, manifestSha256)
         {
             MalformedTemplateCodes = malformed,
         };
     }
 
-    private static ManifestTemplate? ParseTemplate(JsonElement entry, string code, string html, string text)
+    public static bool IsBrandColour(string? value) => value is not null && BrandColour.IsMatch(value);
+
+    public static bool IsLogoHost(string? value) => value is not null && value.Length <= 253 && LowerHostname.IsMatch(value);
+
+    private static ManifestTemplate? ParseTemplate(
+        JsonElement entry, string code, string html, string text, long schemaVersion, IReadOnlyList<ManifestObject> objects)
     {
         if (!TryGet(entry, "id", out var idElement) || !TryString(idElement, out var id)
             || !TryGet(entry, "subject", out var subjectElement) || !TryString(subjectElement, out var subject)
@@ -158,7 +168,57 @@ internal static class ReleaseManifestParser
             intents.Add(parsed);
         }
 
-        return new ManifestTemplate(code, id, subject, preheader, new ManifestSender(senderName, senderAddress), html, text, intents);
+        ManifestBranding? branding = null;
+        if (schemaVersion >= 2 && TryGet(entry, "branding", out var brandingElement))
+        {
+            branding = ParseBranding(brandingElement, objects);
+            if (branding is null)
+                return null;
+        }
+
+        return new ManifestTemplate(code, id, subject, preheader, new ManifestSender(senderName, senderAddress), html, text, intents)
+        {
+            Branding = branding,
+        };
+    }
+
+    private static ManifestBranding? ParseBranding(JsonElement entry, IReadOnlyList<ManifestObject> objects)
+    {
+        if (!StrictJson.HasExactProperties(entry, "audiences", "tokens", "logoHost", "variants")
+            || !TryString(entry.GetProperty("logoHost"), out var logoHost) || !IsLogoHost(logoHost))
+            return null;
+
+        var audiences = StringList(entry.GetProperty("audiences"));
+        if (audiences is null || audiences.Count == 0
+            || audiences.Any(string.IsNullOrWhiteSpace)
+            || audiences.Distinct(StringComparer.Ordinal).Count() != audiences.Count)
+            return null;
+
+        var tokensElement = entry.GetProperty("tokens");
+        if (!StrictJson.HasExactProperties(tokensElement, BrandColourTokens))
+            return null;
+        var tokens = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var name in BrandColourTokens)
+        {
+            if (!TryString(tokensElement.GetProperty(name), out var colour) || !IsBrandColour(colour))
+                return null;
+            tokens[name] = colour;
+        }
+
+        var variantsElement = entry.GetProperty("variants");
+        if (!StrictJson.HasOnlyProperties(variantsElement, [], [ManifestBranding.LogoVariant]))
+            return null;
+        var variants = new Dictionary<string, ManifestTemplateVariant>(StringComparer.Ordinal);
+        foreach (var variant in variantsElement.EnumerateObject())
+        {
+            if (!StrictJson.HasExactProperties(variant.Value, "html")
+                || !TryString(variant.Value.GetProperty("html"), out var variantHtml) || !RegistryKey.IsValid(variantHtml)
+                || !objects.Any(o => string.Equals(o.Key, variantHtml, StringComparison.Ordinal)))
+                return null;
+            variants[variant.Name] = new ManifestTemplateVariant(variantHtml);
+        }
+
+        return new ManifestBranding(audiences, tokens, logoHost, variants);
     }
 
     private static ManifestIntentDeclaration? ParseDeclaration(JsonElement entry)
