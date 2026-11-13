@@ -98,6 +98,51 @@ public class FileUploadServiceLoggingTests
         logger.Entries.Should().NotContain(entry => entry.Contains(FileName));
     }
 
+    [Fact]
+    public async Task A_Failure_Is_Logged_With_The_Exception_Type_And_Key_Ref_Only_Never_Its_Message()
+    {
+        var key = $"{Folder}/{FileName}.pdf";
+        var bytes = Encoding.UTF8.GetBytes("%PDF");
+        foreach (var failure in new Exception[]
+                 {
+                     new AmazonS3Exception($"denied {key} at https://cdn.example/{key}?{Signature}"),
+                     new InvalidOperationException($"broken {key} at https://cdn.example/{key}?{Signature}")
+                 })
+        {
+            var logger = new CapturingLogger();
+            var s3 = new Mock<IAmazonS3>();
+            s3.Setup(c => c.PutObjectAsync(It.IsAny<PutObjectRequest>(), It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+            s3.Setup(c => c.DeleteObjectAsync(It.IsAny<DeleteObjectRequest>(), It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+            s3.Setup(c => c.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>())).Throws(failure);
+            var service = Service(s3.Object, logger);
+            var file = Pdf(bytes);
+
+            await ((Func<Task>)(() => service.DeleteFileAsync(key))).Should().ThrowAsync<Exception>();
+            await ((Func<Task>)(() => service.GetPreSignedUrlAsync(key, 15))).Should().ThrowAsync<Exception>();
+            await ((Func<Task>)(() => service.CreatePresignedPutUrlAsync(key, "application/pdf", bytes.Length))).Should().ThrowAsync<Exception>();
+            if (failure is not AmazonS3Exception)
+            {
+                await ((Func<Task>)(() => service.UploadPrivateFileAsync(file, Folder, FileName))).Should().ThrowAsync<Exception>();
+                await ((Func<Task>)(() => service.UploadBase64ImageAsync(Convert.ToBase64String(bytes), Folder, FileName, "image/png"))).Should().ThrowAsync<Exception>();
+            }
+
+            var errors = logger.Errors;
+            errors.Should().HaveCount(failure is AmazonS3Exception ? 3 : 5);
+            foreach (var entry in errors)
+            {
+                entry.Should().Contain(failure.GetType().Name);
+                entry.Should().MatchRegex("key ref [0-9a-f]{12}");
+                entry.Should().NotContain("denied").And.NotContain("broken");
+                foreach (var forbidden in Forbidden)
+                    entry.Should().NotContain(forbidden);
+            }
+            errors.Should().Contain(entry => entry.Contains($"key ref {Hash(key)}"));
+        }
+    }
+
+    private static string Hash(string key) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..12].ToLowerInvariant();
+
     private static IFormFile Pdf(byte[] bytes)
     {
         var file = new Mock<IFormFile>();
@@ -124,6 +169,7 @@ public class FileUploadServiceLoggingTests
     private sealed class CapturingLogger : ILogger<FileUploadService>
     {
         public List<string> Entries { get; } = [];
+        public List<string> Errors { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -135,7 +181,10 @@ public class FileUploadServiceLoggingTests
             var values = state is IEnumerable<KeyValuePair<string, object?>> pairs
                 ? string.Join("|", pairs.Select(p => $"{p.Key}={p.Value}"))
                 : string.Empty;
-            Entries.Add($"{formatter(state, exception)}|{values}");
+            var entry = $"{formatter(state, exception)}|{values}|{exception?.Message}";
+            Entries.Add(entry);
+            if (logLevel == LogLevel.Error)
+                Errors.Add(entry);
         }
     }
 }

@@ -39,6 +39,8 @@ public class FileUploadService : IFileUploadService
     private static string KeyRef(string s3Key) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(s3Key)))[..12].ToLowerInvariant();
 
+    private static string KeyRefOrNone(string? s3Key) => s3Key is null ? "none" : KeyRef(s3Key);
+
     private bool SupportsCannedAcl()
     {
         var provider = _options.Provider ?? "";
@@ -58,6 +60,7 @@ public class FileUploadService : IFileUploadService
             throw new ArgumentException("File is empty or null", nameof(file));
         }
 
+        string? s3Key = null;
         try
         {
             // Generate unique file name if not provided
@@ -66,7 +69,7 @@ public class FileUploadService : IFileUploadService
                 $"{fileName}{Path.GetExtension(file.FileName)}";
 
             // Combine folder and filename for the full S3 key
-            var s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
+            s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
 
             _logger.LogInformation("Attempting to upload file to S3, key ref {KeyRef}", KeyRef(s3Key));
 
@@ -99,7 +102,8 @@ public class FileUploadService : IFileUploadService
 
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error uploading file to S3: {Message}", ex.Message);
+            _logger.LogError("Unexpected error uploading file to S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -111,10 +115,11 @@ public class FileUploadService : IFileUploadService
             throw new ArgumentException("File URL cannot be null or empty", nameof(fileUrl));
         }
 
+        string? s3Key = null;
         try
         {
             // Extract the S3 key from the CDN URL if needed
-            string s3Key = ExtractS3KeyFromUrl(fileUrl);
+            s3Key = ExtractS3KeyFromUrl(fileUrl);
 
             var deleteObjectRequest = new DeleteObjectRequest
             {
@@ -127,12 +132,14 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error deleting file from S3: {Message}", ex.Message);
+            _logger.LogError("AWS S3 Error deleting file from S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw new Exception($"Error deleting file from S3: {ex.Message}", ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error deleting file from S3: {Message}", ex.Message);
+            _logger.LogError("Unexpected error deleting file from S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -162,10 +169,11 @@ public class FileUploadService : IFileUploadService
 
     public Task<string> GetPreSignedUrlAsync(string fileKey, int expirationMinutes = 15)
     {
+        string? s3Key = null;
         try
         {
             // Extract the S3 key from the CDN URL if needed
-            string s3Key = ExtractS3KeyFromUrl(fileKey);
+            s3Key = ExtractS3KeyFromUrl(fileKey);
 
 
             // R2 rejects SigV2; force V4 immediately before signing (custom ServiceURL endpoints).
@@ -187,12 +195,14 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error getting pre-signed URL: {Message}", ex.Message);
+            _logger.LogError("AWS S3 Error getting pre-signed URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw new Exception($"Error getting pre-signed URL: {ex.Message}", ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error getting pre-signed URL: {Message}", ex.Message);
+            _logger.LogError("Unexpected error getting pre-signed URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -210,9 +220,9 @@ public class FileUploadService : IFileUploadService
         if (contentLength <= 0)
             throw new ArgumentOutOfRangeException(nameof(contentLength), "Content length must be greater than zero");
 
+        var s3Key = key.TrimStart('/');
         try
         {
-            var s3Key = key.TrimStart('/');
             var request = new GetPreSignedUrlRequest
             {
                 BucketName = _bucketName,
@@ -236,12 +246,14 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error creating presigned PUT URL: {Message}", ex.Message);
+            _logger.LogError("AWS S3 Error creating presigned PUT URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRef(s3Key));
             throw new Exception($"Error creating presigned PUT URL: {ex.Message}", ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error creating presigned PUT URL: {Message}", ex.Message);
+            _logger.LogError("Unexpected error creating presigned PUT URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRef(s3Key));
             throw;
         }
     }
@@ -316,6 +328,7 @@ public class FileUploadService : IFileUploadService
             throw new ArgumentException("Base64 image string is empty or null", nameof(base64Image));
         }
 
+        string? s3Key = null;
         try
         {
             // Remove data URI prefix if present (e.g., "data:image/jpeg;base64,")
@@ -360,7 +373,7 @@ public class FileUploadService : IFileUploadService
                 : $"{fileName}{extension}";
 
             // Combine folder and filename for the full S3 key
-            var s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
+            s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
 
             _logger.LogInformation("Attempting to upload Base64 image to S3, key ref {KeyRef}", KeyRef(s3Key));
 
@@ -401,7 +414,8 @@ public class FileUploadService : IFileUploadService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error uploading Base64 image to S3: {Message}", ex.Message);
+            _logger.LogError("Unexpected error uploading Base64 image to S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
