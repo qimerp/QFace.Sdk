@@ -4,13 +4,15 @@ namespace QimErp.Shared.Common.Activities.Payroll;
 /// Request payload for the Payroll benefit-sync Temporal worker.
 /// Covers all benefit events that affect payroll deductions/assignments:
 /// EnrollmentCreated, EnrollmentUpdated, EnrollmentTerminated,
-/// LoanCreated, LoanRepayment, AccommodationAllocated, AccommodationVacated.
+/// LoanCreated, LoanRepayment, LoanApproved, LoanStopped,
+/// AccommodationAllocated, AccommodationVacated.
 /// </summary>
 public class BenefitSyncRequest
 {
     /// <summary>
     /// Discriminator: EnrollmentCreated / EnrollmentUpdated / EnrollmentTerminated /
-    /// LoanCreated / LoanRepayment / AccommodationAllocated / AccommodationVacated
+    /// LoanCreated / LoanRepayment / AccommodationAllocated / AccommodationVacated /
+    /// LoanApproved (starts payroll recovery of the loan) / LoanStopped (ends it; see <see cref="StopKind"/>)
     /// </summary>
     public string Action { get; set; } = "";
 
@@ -33,6 +35,18 @@ public class BenefitSyncRequest
     public string? LoanCode { get; set; }
     public decimal PaymentAmount { get; set; }
     public decimal OutstandingBalance { get; set; }
+    public Guid? LoanId { get; set; }
+    public decimal InstallmentAmount { get; set; }
+    public int InstallmentCount { get; set; }
+
+    /// <summary>The last instalment carries the rounding; null means every instalment equals <see cref="InstallmentAmount"/>.</summary>
+    public decimal? FinalInstallmentAmount { get; set; }
+
+    public DateOnly? FirstDeductionOn { get; set; }
+    public string? CurrencyCode { get; set; }
+
+    /// <summary>Cancelled | Defaulted | Settled. Set on LoanStopped.</summary>
+    public string? StopKind { get; set; }
 
     // ── Accommodation fields ──────────────────────────────────────────────────
     public string? AccommodationCode { get; set; }

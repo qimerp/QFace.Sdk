@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "key": "operator.account_manager.assigned",
+  "version": 1,
+  "owner": {
+    "domain": "operator",
+    "service": "QimErp.Operator"
+  },
+  "summary": "An operator was assigned as account manager for a tenant.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "account_manager",
+      "recipient": {
+        "source": "platform",
+        "from": "accountManagerOperatorId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "accountManagerOperatorId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    },
+    {
+      "name": "subjectTenantId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "subjectTenant.name"
+    },
+    {
+      "name": "WorkspaceUrl",
+      "type": "hostname",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "workspace.example.qimerp.com",
+      "resolvedFrom": "subjectTenant.workspaceHost"
+    },
+    {
+      "name": "PlanName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example plan",
+      "resolvedFrom": "subjectTenant.planName"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://operator.example.qimerp.com/tenants/00000000-0000-4000-8000-000000000001",
+      "resolvedFrom": "operator.tenantProfileUrl",
+      "url": {
+        "host": "operator-console",
+        "purpose": "operator_tenant_profile",
+        "reference": "subjectTenantId"
+      }
+    }
+  ]
+}

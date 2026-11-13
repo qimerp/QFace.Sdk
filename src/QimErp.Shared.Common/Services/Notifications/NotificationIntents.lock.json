@@ -1,7 +1,10 @@
 {
   "contracts": {
     "auth.password_reset.requested@1": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682",
+    "operator.account_manager.assigned@1": "0b422122570cfff73d5b768d15192e2100c1e2d0afdf2463a196c8475c05ca8e",
+    "tenant.reply_address.verification_requested@1": "4a0c79fed2c6da455aaa7169313649c6237ae6d88fe1be6af719475b1af92220",
+    "workflow.approval.reminder@1": "6565181f1420b8f56e1364cf1f0f90ee2bbf724f70e1a2f6f647ea973a8bc3ef",
     "workflow.approval.requested@1": "3be98cb078110858d66aff7b2e0272043f022f5fb0153143bbb416e1d785e4fb"
   },
-  "revision": "374b00274fb61159e8e2af7183b3b60e19aac0006d2d9d4c6040d352eee7886d"
+  "revision": "cb6d094c3c030c588bbc017d7b05731e1eaebb2fde42297b3cea59ea3cd79c5f"
 }
