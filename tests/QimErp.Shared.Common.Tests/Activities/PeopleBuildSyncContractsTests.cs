@@ -79,6 +79,49 @@ public sealed class PeopleBuildSyncContractsTests
         restored.FirstDeductionOn.Should().BeNull();
         restored.CurrencyCode.Should().BeNull();
         restored.StopKind.Should().BeNull();
+        restored.RepaymentId.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_manual_loan_repayment_round_trips_on_the_temporal_wire_and_as_web_json()
+    {
+        var request = new BenefitSyncRequest
+        {
+            Action = "LoanRepayment",
+            TenantId = "tenant-a",
+            EmployeeId = Guid.NewGuid(),
+            LoanId = Guid.NewGuid(),
+            LoanCode = "LN-0001",
+            RepaymentId = Guid.NewGuid(),
+            PaymentAmount = 600m,
+            OutstandingBalance = 0m,
+            EffectiveDate = new DateTime(2027, 1, 5, 0, 0, 0, DateTimeKind.Utc),
+            CurrencyCode = "GHS"
+        };
+
+        TemporalRoundTrip<BenefitSyncRequest, BenefitSyncRequest>(request).Should().BeEquivalentTo(request);
+        RoundTrip(request).Should().BeEquivalentTo(request);
+    }
+
+    [Fact]
+    public void A_worker_without_the_repayment_id_still_reads_a_manual_loan_repayment()
+    {
+        var request = new BenefitSyncRequest
+        {
+            Action = "LoanRepayment",
+            TenantId = "tenant-a",
+            EmployeeId = Guid.NewGuid(),
+            LoanId = Guid.NewGuid(),
+            RepaymentId = Guid.NewGuid(),
+            PaymentAmount = 600m,
+            CurrencyCode = "GHS"
+        };
+
+        var restored = TemporalRoundTrip<BenefitSyncRequest, LoanApprovalBeforeFinalInstallment>(request);
+
+        restored.LoanId.Should().Be(request.LoanId);
+        restored.Action.Should().Be("LoanRepayment");
+        TemporalRoundTrip<LoanApprovalBeforeFinalInstallment, BenefitSyncRequest>(restored).RepaymentId.Should().BeNull();
     }
 
     [Fact]

@@ -48,6 +48,12 @@ public class BenefitSyncRequest
     /// <summary>Cancelled | Defaulted | Settled. Set on LoanStopped.</summary>
     public string? StopKind { get; set; }
 
+    /// <summary>
+    /// LoanRepayment: the id of the repayment recorded by hand in People (PaymentAmount in CurrencyCode, paid on EffectiveDate);
+    /// Payroll applies each id once. Null on LoanRepayment payloads that predate it.
+    /// </summary>
+    public Guid? RepaymentId { get; set; }
+
     // ── Accommodation fields ──────────────────────────────────────────────────
     public string? AccommodationCode { get; set; }
     public decimal MonthlyRent { get; set; }
