@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "key": "people.leave_plan.nudged",
+  "version": 1,
+  "owner": {
+    "domain": "people",
+    "service": "QimErp.CoreHr"
+  },
+  "summary": "HR nudged an employee who has leave left and none planned.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "employee",
+      "recipient": {
+        "source": "platform",
+        "from": "recipientId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "recipientId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "RemainingDays",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "12.5"
+    },
+    {
+      "name": "LeaveYear",
+      "type": "integer",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "2026"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "TenantInitials",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "ET",
+      "resolvedFrom": "tenant.initials"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://people.example.qimerp.com/example/hr/onboarding/00000000-0000-4000-8000-000000000001",
+      "resolvedFrom": "people.appUrl",
+      "url": {
+        "host": "people-app",
+        "purpose": "people_app"
+      }
+    }
+  ]
+}

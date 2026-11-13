@@ -4,7 +4,7 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "cb6d094c3c030c588bbc017d7b05731e1eaebb2fde42297b3cea59ea3cd79c5f";
+    public const string ContractRevision = "17c1ea07cb493716cf62e8617780eee016a9470638db30171b5f7b1a4f512734";
 
     public static class Auth
     {
@@ -20,6 +20,85 @@ public static class NotificationIntents
         public static class AccountManagerAssigned
         {
             public const string Key = "operator.account_manager.assigned";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class People
+    {
+        public static class BenefitEnrollmentClosing
+        {
+            public const string Key = "people.benefit_enrollment.closing";
+            public const int V1 = 1;
+        }
+        public static class DocumentExpiring
+        {
+            public const string Key = "people.document.expiring";
+            public const int V1 = 1;
+        }
+        public static class EmployeeMessageReceived
+        {
+            public const string Key = "people.employee_message.received";
+            public const int V1 = 1;
+        }
+        public static class HrMessageSent
+        {
+            public const string Key = "people.hr_message.sent";
+            public const int V1 = 1;
+        }
+        public static class LeavePlanNudged
+        {
+            public const string Key = "people.leave_plan.nudged";
+            public const int V1 = 1;
+        }
+        public static class NewsPublished
+        {
+            public const string Key = "people.news.published";
+            public const int V1 = 1;
+        }
+        public static class OnboardingCancelled
+        {
+            public const string Key = "people.onboarding.cancelled";
+            public const int V1 = 1;
+        }
+        public static class OnboardingHelperAssigned
+        {
+            public const string Key = "people.onboarding.helper_assigned";
+            public const int V1 = 1;
+        }
+        public static class OnboardingMessageSent
+        {
+            public const string Key = "people.onboarding.message_sent";
+            public const int V1 = 1;
+        }
+        public static class OnboardingTaskCompleted
+        {
+            public const string Key = "people.onboarding_task.completed";
+            public const int V1 = 1;
+        }
+        public static class OnboardingTaskEscalated
+        {
+            public const string Key = "people.onboarding_task.escalated";
+            public const int V1 = 1;
+        }
+        public static class OnboardingTaskReminder
+        {
+            public const string Key = "people.onboarding_task.reminder";
+            public const int V1 = 1;
+        }
+        public static class RetirementNoticeDue
+        {
+            public const string Key = "people.retirement.notice_due";
+            public const int V1 = 1;
+        }
+        public static class WorkAnniversaryToday
+        {
+            public const string Key = "people.work_anniversary.today";
+            public const int V1 = 1;
+        }
+        public static class WorkAnniversaryUpcoming
+        {
+            public const string Key = "people.work_anniversary.upcoming";
             public const int V1 = 1;
         }
     }
