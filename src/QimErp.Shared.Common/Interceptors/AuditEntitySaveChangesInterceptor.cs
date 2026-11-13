@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Runtime.CompilerServices;
 using System.Transactions;
+using QimErp.Shared.Common.Logging;
 using QimErp.Shared.Common.Outbox;
 using QimErp.Shared.Common.Outbox.Transports;
 using QimErp.Shared.Common.Services.MultiTenancy;
@@ -635,9 +636,14 @@ public class AuditEntitySaveChangesInterceptor(
             if (originalCompanyId.Length > 0
                 && !string.Equals(originalCompanyId, currentCompanyId, StringComparison.Ordinal))
             {
-                logger.LogWarning(
-                    "Cross-company move: {EntityType} moved from company {FromCompanyId} to {ToCompanyId} by user {UserId}",
-                    entityTypeName, originalCompanyId, currentCompanyId, userContextService?.GetUserId());
+                if (serviceProvider.GetService<AnonymousRequestContext>()?.IsAnonymous == true)
+                    logger.LogWarning(
+                        "Cross-company move: {EntityType} moved from company {FromCompanyId} to {ToCompanyId}",
+                        entityTypeName, originalCompanyId, currentCompanyId);
+                else
+                    logger.LogWarning(
+                        "Cross-company move: {EntityType} moved from company {FromCompanyId} to {ToCompanyId} by user {UserId}",
+                        entityTypeName, originalCompanyId, currentCompanyId, userContextService?.GetUserId());
             }
         }
     }

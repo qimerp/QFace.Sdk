@@ -1,3 +1,5 @@
+using QimErp.Shared.Common.Logging;
+
 namespace QimErp.Shared.Common.Middlewares;
 
 /// <summary>
@@ -20,7 +22,7 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
         }
         else
         {
-            correlationId = Guid.CreateVersion7().ToString("N");
+            correlationId = (AnonymousRequests.IsAnonymousEndpoint(context) ? Guid.NewGuid() : Guid.CreateVersion7()).ToString("N");
         }
 
         context.Items[HttpContextItemKey] = correlationId;

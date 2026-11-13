@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using QimErp.Shared.Common.Logging;
 
 namespace QimErp.Shared.Common.Behaviours;
 
@@ -7,7 +8,8 @@ namespace QimErp.Shared.Common.Behaviours;
 /// Add <c>AddSource("QimErp.MediatR")</c> (or your host application name) when configuring tracing.
 /// </summary>
 public sealed class TracingBehaviour<TRequest, TResponse>(
-    ILogger<TracingBehaviour<TRequest, TResponse>> logger)
+    ILogger<TracingBehaviour<TRequest, TResponse>> logger,
+    AnonymousRequestContext? anonymousRequest = null)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
@@ -28,6 +30,13 @@ public sealed class TracingBehaviour<TRequest, TResponse>(
             var response = await next();
             activity?.SetStatus(ActivityStatusCode.Ok);
             return response;
+        }
+        catch (Exception ex) when (request is IAnonymousRequest || anonymousRequest?.IsAnonymous == true)
+        {
+            logger.LogDebug(AnonymousRequests.TypeOnly(ex), "MediatR tracing: error in {RequestType}", operationName);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.GetType().FullName);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            throw;
         }
         catch (Exception ex)
         {

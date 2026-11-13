@@ -7,7 +7,8 @@ namespace QimErp.Shared.Common.Behaviours;
 /// </summary>
 public sealed class LoggingBehaviour<TRequest, TResponse>(
     ILogger<LoggingBehaviour<TRequest, TResponse>> logger,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    AnonymousRequestContext? anonymousRequest = null)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
@@ -17,7 +18,13 @@ public sealed class LoggingBehaviour<TRequest, TResponse>(
         CancellationToken cancellationToken)
     {
         var requestTypeName = typeof(TRequest).Name;
-        using (logger.BeginMediatrObservabilityScope(currentUserService, requestTypeName))
+        var anonymous = request is IAnonymousRequest || anonymousRequest?.IsAnonymous == true;
+        if (anonymous)
+            anonymousRequest?.MarkAnonymous();
+
+        using (anonymous
+                   ? logger.BeginAnonymousMediatrScope(currentUserService, requestTypeName)
+                   : logger.BeginMediatrObservabilityScope(currentUserService, requestTypeName))
         {
             if (requestTypeName.EndsWith("Query", StringComparison.Ordinal))
                 logger.LogDebug("Starting feature {FeatureName}", requestTypeName);

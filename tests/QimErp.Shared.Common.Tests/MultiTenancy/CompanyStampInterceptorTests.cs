@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using QimErp.Shared.Common.Entities;
 using QimErp.Shared.Common.ExceptionHandlers;
 using QimErp.Shared.Common.Interceptors;
+using QimErp.Shared.Common.Logging;
 using QimErp.Shared.Common.Services;
 using QimErp.Shared.Common.Services.Auth;
 using QimErp.Shared.Common.Services.MultiTenancy;
@@ -65,10 +66,11 @@ public sealed class CompanyStampInterceptorTests : IDisposable
         public CompanyDbContext Db { get; }
         public CapturingLogger Log { get; } = new();
 
-        public Harness(bool withTenant = true)
+        public Harness(bool withTenant = true, string? userId = null, bool anonymous = false)
         {
             var services = new ServiceCollection();
             services.AddHttpContextAccessor();
+            services.AddScoped<AnonymousRequestContext>();
             services.AddScoped<UserContextService>();
             services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<UserContextService>());
             services.AddScoped<ITenantContext, TenantContext>();
@@ -81,13 +83,16 @@ public sealed class CompanyStampInterceptorTests : IDisposable
             var userService = sp.GetRequiredService<UserContextService>();
             if (withTenant)
             {
-                userService.SetContext(Tenant, "tester@qimerp.com");
+                userService.SetContext(Tenant, "tester@qimerp.com", userId: userId);
                 sp.GetRequiredService<ITenantContext>().SetTenant(Tenant);
             }
             else
             {
                 userService.ClearContext();
             }
+
+            if (anonymous)
+                sp.GetRequiredService<AnonymousRequestContext>().MarkAnonymous();
 
             var interceptor = new AuditEntitySaveChangesInterceptor(userService, Log, sp);
 
@@ -306,6 +311,27 @@ public sealed class CompanyStampInterceptorTests : IDisposable
         await act.Should().NotThrowAsync();
         harness.Log.Entries.Should().Contain(e =>
             e.Level == LogLevel.Warning && e.Message.Contains("Cross-company move"));
+    }
+
+    [Theory(DisplayName = "The cross-company move warning names the user only outside an anonymous request")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Guard_Move_Warning_Honours_AnonymousRequest(bool anonymous)
+    {
+        using var harness = new Harness(userId: "user-7f3a91", anonymous: anonymous);
+        SetScope(CompanyScope.ForCompanies([CompanyA, CompanyB], CompanyA));
+
+        var row = EntityCodeConfig.Create(string.Empty, "Invoice");
+        harness.Db.Configs.Add(row);
+        await harness.Db.SaveChangesAsync();
+        row.CompanyId = CompanyB;
+        await harness.Db.SaveChangesAsync();
+
+        var warning = harness.Log.Entries.Single(e => e.Message.Contains("Cross-company move"));
+        if (anonymous)
+            warning.Message.Should().NotContain("user-7f3a91");
+        else
+            warning.Message.Should().Contain("user-7f3a91");
     }
 
     [Fact(DisplayName = "Synchronous SaveChanges stamps tenant and company identically to the async path")]
