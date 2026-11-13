@@ -97,7 +97,81 @@ public sealed class PeopleBuildSyncContractsTests
 
         RoundTrip(request).Should().BeEquivalentTo(request);
         PropertyNames<BenefitLoanRepaymentSyncRequest>().Should().BeEquivalentTo(
-            "Action", "LoanId", "PayrollRunId", "PeriodStart", "Amount", "CurrencyCode", "SourceLineId");
+            "Action", "LoanId", "PayrollRunId", "PeriodStart", "Amount", "CurrencyCode", "SourceLineId",
+            "IsFinalSettlement", "ShortfallAmount");
+    }
+
+    [Fact]
+    public void A_final_settlement_report_with_nothing_taken_round_trips_on_the_temporal_wire()
+    {
+        var request = new BenefitLoanRepaymentSyncRequest
+        {
+            Action = "Deducted",
+            LoanId = Guid.NewGuid(),
+            PayrollRunId = Guid.NewGuid(),
+            PeriodStart = new DateOnly(2026, 12, 1),
+            Amount = 0m,
+            CurrencyCode = "GHS",
+            IsFinalSettlement = true,
+            ShortfallAmount = 750.25m
+        };
+
+        var restored = TemporalRoundTrip<BenefitLoanRepaymentSyncRequest, BenefitLoanRepaymentSyncRequest>(request);
+
+        restored.Should().BeEquivalentTo(request);
+        restored.IsFinalSettlement.Should().BeTrue();
+        restored.ShortfallAmount.Should().Be(750.25m);
+        restored.SourceLineId.Should().BeEmpty();
+        RoundTrip(request).Should().BeEquivalentTo(request);
+    }
+
+    [Fact]
+    public void A_repayment_report_from_a_sender_without_the_settlement_fields_reads_as_a_plain_deduction()
+    {
+        var before = new RepaymentBeforeSettlement
+        {
+            Action = "Deducted",
+            LoanId = Guid.NewGuid(),
+            PayrollRunId = Guid.NewGuid(),
+            PeriodStart = new DateOnly(2026, 12, 1),
+            Amount = 416.67m,
+            CurrencyCode = "GHS",
+            SourceLineId = Guid.NewGuid()
+        };
+
+        var restored = TemporalRoundTrip<RepaymentBeforeSettlement, BenefitLoanRepaymentSyncRequest>(before);
+
+        restored.Should().BeEquivalentTo(before);
+        restored.IsFinalSettlement.Should().BeFalse();
+        restored.ShortfallAmount.Should().BeNull();
+
+        var web = JsonSerializer.Deserialize<BenefitLoanRepaymentSyncRequest>(
+            """{"action":"Deducted","loanId":"0193e2a0-0000-7000-8000-000000000005","payrollRunId":"0193e2a0-0000-7000-8000-000000000006","periodStart":"2026-12-01","amount":416.67,"currencyCode":"GHS","sourceLineId":"0193e2a0-0000-7000-8000-000000000007"}""",
+            Web)!;
+        web.Amount.Should().Be(416.67m);
+        web.IsFinalSettlement.Should().BeFalse();
+        web.ShortfallAmount.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_worker_without_the_settlement_fields_still_reads_a_settlement_report()
+    {
+        var request = new BenefitLoanRepaymentSyncRequest
+        {
+            Action = "Deducted",
+            LoanId = Guid.NewGuid(),
+            PayrollRunId = Guid.NewGuid(),
+            PeriodStart = new DateOnly(2026, 12, 1),
+            Amount = 1_000m,
+            CurrencyCode = "GHS",
+            SourceLineId = Guid.NewGuid(),
+            IsFinalSettlement = true,
+            ShortfallAmount = 0m
+        };
+
+        var restored = TemporalRoundTrip<BenefitLoanRepaymentSyncRequest, RepaymentBeforeSettlement>(request);
+
+        restored.Should().BeEquivalentTo(request, options => options.ExcludingMissingMembers());
     }
 
     [Fact]
@@ -315,6 +389,17 @@ public sealed class PeopleBuildSyncContractsTests
         public int InstallmentCount { get; set; }
         public DateOnly? FirstDeductionOn { get; set; }
         public string? CurrencyCode { get; set; }
+    }
+
+    private sealed class RepaymentBeforeSettlement
+    {
+        public string Action { get; set; } = "";
+        public Guid LoanId { get; set; }
+        public Guid PayrollRunId { get; set; }
+        public DateOnly PeriodStart { get; set; }
+        public decimal Amount { get; set; }
+        public string CurrencyCode { get; set; } = "";
+        public Guid SourceLineId { get; set; }
     }
 
     private static TOut TemporalRoundTrip<TIn, TOut>(TIn value)
