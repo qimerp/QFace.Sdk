@@ -254,6 +254,7 @@ public static class HrNewsActivityTypes
     public const string NewsCreated = "news-created";
     public const string NewsPublished = "news-published";
     public const string NewsAttachmentAdded = "news-attachment-added";
+    public const string NewsImageRemoved = "news-image-removed";
     public const string NewsContributionCreated = "news-contribution-created";
     public const string NewsContributionUpdated = "news-contribution-updated";
     public const string NewsContributionDeleted = "news-contribution-deleted";
