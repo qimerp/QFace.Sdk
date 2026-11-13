@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text;
 using Amazon.S3.Model;
 using Microsoft.AspNetCore.Http;
@@ -40,6 +41,10 @@ public class FileUploadService : IFileUploadService
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(s3Key)))[..12].ToLowerInvariant();
 
     private static string KeyRefOrNone(string? s3Key) => s3Key is null ? "none" : KeyRef(s3Key);
+
+    /// <summary>S3 and URI messages can carry keys and signed URLs, so a failure leaves this class only as its type and stack trace.</summary>
+    private static Exception TypeOnly(Exception ex) =>
+        ExceptionDispatchInfo.SetRemoteStackTrace(new Exception(ex.GetType().FullName), ex.StackTrace ?? string.Empty);
 
     private bool SupportsCannedAcl()
     {
@@ -95,9 +100,9 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error uploading file to S3. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}",
+            _logger.LogError(TypeOnly(ex), "AWS S3 Error uploading file to S3. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}",
                 ex.StatusCode, ex.ErrorCode);
-            throw new Exception($"Error uploading file to S3: {ex.Message}", ex);
+            throw new Exception("Error uploading file to S3", TypeOnly(ex));
         }
 
         catch (Exception ex)
@@ -134,7 +139,7 @@ public class FileUploadService : IFileUploadService
         {
             _logger.LogError("AWS S3 Error deleting file from S3 ({ExceptionType}), key ref {KeyRef}",
                 ex.GetType().Name, KeyRefOrNone(s3Key));
-            throw new Exception($"Error deleting file from S3: {ex.Message}", ex);
+            throw new Exception("Error deleting file from S3", TypeOnly(ex));
         }
         catch (Exception ex)
         {
@@ -197,7 +202,7 @@ public class FileUploadService : IFileUploadService
         {
             _logger.LogError("AWS S3 Error getting pre-signed URL ({ExceptionType}), key ref {KeyRef}",
                 ex.GetType().Name, KeyRefOrNone(s3Key));
-            throw new Exception($"Error getting pre-signed URL: {ex.Message}", ex);
+            throw new Exception("Error getting pre-signed URL", TypeOnly(ex));
         }
         catch (Exception ex)
         {
@@ -248,7 +253,7 @@ public class FileUploadService : IFileUploadService
         {
             _logger.LogError("AWS S3 Error creating presigned PUT URL ({ExceptionType}), key ref {KeyRef}",
                 ex.GetType().Name, KeyRef(s3Key));
-            throw new Exception($"Error creating presigned PUT URL: {ex.Message}", ex);
+            throw new Exception("Error creating presigned PUT URL", TypeOnly(ex));
         }
         catch (Exception ex)
         {
@@ -308,8 +313,8 @@ public class FileUploadService : IFileUploadService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error extracting S3 key from a URL");
-            throw new ArgumentException("Invalid URL format", nameof(url), ex);
+            _logger.LogError(TypeOnly(ex), "Error extracting S3 key from a URL");
+            throw new ArgumentException("Invalid URL format", nameof(url), TypeOnly(ex));
         }
     }
 
@@ -386,8 +391,8 @@ public class FileUploadService : IFileUploadService
             }
             catch (FormatException ex)
             {
-                _logger.LogError(ex, "Invalid Base64 string format");
-                throw new ArgumentException("Invalid Base64 string format", nameof(base64Image), ex);
+                _logger.LogError(TypeOnly(ex), "Invalid Base64 string format");
+                throw new ArgumentException("Invalid Base64 string format", nameof(base64Image), TypeOnly(ex));
             }
 
             using var memoryStream = new MemoryStream(imageBytes);
@@ -408,9 +413,9 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error uploading Base64 image to S3. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}",
+            _logger.LogError(TypeOnly(ex), "AWS S3 Error uploading Base64 image to S3. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}",
                 ex.StatusCode, ex.ErrorCode);
-            throw new Exception($"Error uploading Base64 image to S3: {ex.Message}", ex);
+            throw new Exception("Error uploading Base64 image to S3", TypeOnly(ex));
         }
         catch (Exception ex)
         {
@@ -523,7 +528,7 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "S3 error getting object, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
+            _logger.LogError(TypeOnly(ex), "S3 error getting object, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
             throw;
         }
     }
@@ -548,7 +553,7 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "S3 error uploading content, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
+            _logger.LogError(TypeOnly(ex), "S3 error uploading content, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
             throw;
         }
     }
@@ -575,7 +580,7 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "S3 error streaming upload, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
+            _logger.LogError(TypeOnly(ex), "S3 error streaming upload, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
             throw;
         }
     }

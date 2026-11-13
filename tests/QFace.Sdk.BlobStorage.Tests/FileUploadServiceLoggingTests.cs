@@ -140,6 +140,65 @@ public class FileUploadServiceLoggingTests
         }
     }
 
+    [Fact]
+    public async Task A_Wrapped_Or_Logged_S3_Failure_Carries_Its_Type_And_Stack_Trace_Never_Its_Message()
+    {
+        var key = $"{Folder}/{FileName}.pdf";
+        var bytes = Encoding.UTF8.GetBytes("%PDF");
+        var failure = new AmazonS3Exception($"denied {key} at https://cdn.example/{key}?{Signature}")
+        {
+            StatusCode = HttpStatusCode.InternalServerError,
+            ErrorCode = "InternalError"
+        };
+        var logger = new CapturingLogger();
+        var s3 = new Mock<IAmazonS3>();
+        s3.Setup(c => c.PutObjectAsync(It.IsAny<PutObjectRequest>(), It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+        s3.Setup(c => c.DeleteObjectAsync(It.IsAny<DeleteObjectRequest>(), It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+        s3.Setup(c => c.GetObjectAsync(It.IsAny<GetObjectRequest>(), It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+        s3.Setup(c => c.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>())).Throws(failure);
+        var service = Service(s3.Object, logger);
+
+        var wrapped = new List<Exception>();
+        foreach (var call in new Func<Task>[]
+                 {
+                     () => service.UploadPrivateFileAsync(Pdf(bytes), Folder, FileName),
+                     () => service.UploadBase64ImageAsync(Convert.ToBase64String(bytes), Folder, FileName, "image/png"),
+                     () => service.DeleteFileAsync(key),
+                     () => service.GetPreSignedUrlAsync(key, 15),
+                     () => service.CreatePresignedPutUrlAsync(key, "application/pdf", bytes.Length)
+                 })
+            wrapped.Add((await call.Should().ThrowAsync<Exception>()).Which);
+        await ((Func<Task>)(() => service.GetObjectBytesAsync(key))).Should().ThrowAsync<AmazonS3Exception>();
+        await ((Func<Task>)(() => service.UploadContentAsync("text", key))).Should().ThrowAsync<AmazonS3Exception>();
+        await ((Func<Task>)(() => service.UploadStreamAsync(new MemoryStream(bytes), key, "application/pdf"))).Should().ThrowAsync<AmazonS3Exception>();
+
+        foreach (var exception in wrapped)
+        {
+            exception.Should().NotBeSameAs(failure);
+            exception.ToString().Should().NotContain("denied").And.NotContain(FileName).And.NotContain(Signature);
+            exception.InnerException.Should().NotBeNull();
+            exception.InnerException!.Message.Should().Contain(nameof(AmazonS3Exception));
+            exception.InnerException.StackTrace.Should().Contain(nameof(FileUploadService));
+        }
+
+        logger.Errors.Should().HaveCount(8);
+        logger.Attached.Should().NotBeEmpty();
+        foreach (var entry in logger.Errors)
+        {
+            entry.Should().NotContain("denied");
+            foreach (var forbidden in Forbidden)
+                entry.Should().NotContain(forbidden);
+        }
+        foreach (var attached in logger.Attached)
+        {
+            attached.Should().NotBeSameAs(failure);
+            attached.Message.Should().Contain(nameof(AmazonS3Exception));
+            attached.StackTrace.Should().Contain(nameof(FileUploadService));
+        }
+        logger.Errors.Where(e => e.Contains("StatusCode")).Should().HaveCount(5)
+            .And.OnlyContain(e => e.Contains("InternalError") && e.Contains("InternalServerError"));
+    }
+
     private static string Hash(string key) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..12].ToLowerInvariant();
 
@@ -170,6 +229,7 @@ public class FileUploadServiceLoggingTests
     {
         public List<string> Entries { get; } = [];
         public List<string> Errors { get; } = [];
+        public List<Exception> Attached { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -181,10 +241,12 @@ public class FileUploadServiceLoggingTests
             var values = state is IEnumerable<KeyValuePair<string, object?>> pairs
                 ? string.Join("|", pairs.Select(p => $"{p.Key}={p.Value}"))
                 : string.Empty;
-            var entry = $"{formatter(state, exception)}|{values}|{exception?.Message}";
+            var entry = $"{formatter(state, exception)}|{values}|{exception}";
             Entries.Add(entry);
             if (logLevel == LogLevel.Error)
                 Errors.Add(entry);
+            if (exception is not null)
+                Attached.Add(exception);
         }
     }
 }
