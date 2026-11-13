@@ -38,6 +38,10 @@ public class BenefitSyncRequest
     public Guid? LoanId { get; set; }
     public decimal InstallmentAmount { get; set; }
     public int InstallmentCount { get; set; }
+
+    /// <summary>The last instalment carries the rounding; null means every instalment equals <see cref="InstallmentAmount"/>.</summary>
+    public decimal? FinalInstallmentAmount { get; set; }
+
     public DateOnly? FirstDeductionOn { get; set; }
     public string? CurrencyCode { get; set; }
 
