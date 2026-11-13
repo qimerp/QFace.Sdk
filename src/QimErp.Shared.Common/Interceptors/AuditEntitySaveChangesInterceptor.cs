@@ -406,9 +406,12 @@ public class AuditEntitySaveChangesInterceptor(
         foreach (var entry in entriesToStamp)
         {
             entry.Entity.TenantId = tenantId;
-            logger.LogDebug("Set TenantId={TenantId} on {EntityType} {EntityId}",
-                tenantId, entry.Entity.GetType().Name,
-                entry.Entity.GetType().GetProperty("Id")?.GetValue(entry.Entity));
+            if (IsAnonymous(entry.Entity))
+                logger.LogDebug("Set TenantId={TenantId} on {EntityType}", tenantId, entry.Entity.GetType().Name);
+            else
+                logger.LogDebug("Set TenantId={TenantId} on {EntityType} {EntityId}",
+                    tenantId, entry.Entity.GetType().Name,
+                    entry.Entity.GetType().GetProperty("Id")?.GetValue(entry.Entity));
         }
     }
 
@@ -665,10 +668,11 @@ public class AuditEntitySaveChangesInterceptor(
 
         foreach (var entry in entries)
         {
-            var userId = userContextService.GetUserId();
+            var anonymous = IsAnonymous(entry.Entity);
+            var userId = anonymous ? IAnonymousRecord.Actor : userContextService.GetUserId();
             var tenantId = userContextService.GetTenantId();
-            var email = userContextService.GetUserEmail();
-            var name = userContextService.GetUserName();
+            var email = anonymous ? string.Empty : userContextService.GetUserEmail();
+            var name = anonymous ? string.Empty : userContextService.GetUserName();
             var timestamp = DateTime.UtcNow;
 
             try
@@ -717,6 +721,9 @@ public class AuditEntitySaveChangesInterceptor(
                             entry.State, entry.Entity.GetType().Name, entry.Entity.TenantId);
                         break;
                 }
+
+                if (anonymous && entry.State is EntityState.Added or EntityState.Modified)
+                    RemoveActorAndExactTimes(entry);
             }
             catch (Exception ex)
             {
@@ -725,6 +732,64 @@ public class AuditEntitySaveChangesInterceptor(
                 throw;
             }
         }
+    }
+
+    private static readonly string[] AnonymousActorIdProperties =
+    [
+        nameof(AuditableEntity.CreatedByUserId),
+        nameof(AuditableEntity.LastModifiedByUserId),
+        nameof(AuditableEntity.EntityStatusCreatedByUserId),
+        nameof(AuditableEntity.EntityStatusLastModifiedByUserId)
+    ];
+
+    private static readonly string[] AnonymousActorDetailProperties =
+    [
+        nameof(AuditableEntity.CreatedByEmail),
+        nameof(AuditableEntity.CreatedByName),
+        nameof(AuditableEntity.LastModifiedByEmail),
+        nameof(AuditableEntity.LastModifiedByName),
+        nameof(AuditableEntity.EntityStatusCreatedByEmail),
+        nameof(AuditableEntity.EntityStatusCreatedByName),
+        nameof(AuditableEntity.EntityStatusLastModifiedByEmail),
+        nameof(AuditableEntity.EntityStatusLastModifiedByName)
+    ];
+
+    private static readonly string[] AnonymousTimestampProperties =
+    [
+        nameof(AuditableEntity.Created),
+        nameof(AuditableEntity.LastModified),
+        nameof(AuditableEntity.EntityStatusCreated),
+        nameof(AuditableEntity.EntityStatusLastModified)
+    ];
+
+    private static bool IsAnonymous(object entity) => entity is IAnonymousRecord { IsAnonymousRecord: true };
+
+    private static void RemoveActorAndExactTimes(EntityEntry<AuditableEntity> entry)
+    {
+        foreach (var name in AnonymousActorIdProperties)
+            SetIfMapped(entry, name, IAnonymousRecord.Actor);
+
+        foreach (var name in AnonymousActorDetailProperties)
+            SetIfMapped(entry, name, string.Empty);
+
+        foreach (var name in AnonymousTimestampProperties)
+        {
+            if (entry.Metadata.FindProperty(name) is null)
+                continue;
+
+            var property = entry.Property(name);
+            if (property.CurrentValue is DateTime timestamp)
+            {
+                var utc = timestamp.Kind == DateTimeKind.Local ? timestamp.ToUniversalTime() : timestamp;
+                property.CurrentValue = DateTime.SpecifyKind(utc.Date, DateTimeKind.Utc);
+            }
+        }
+    }
+
+    private static void SetIfMapped(EntityEntry<AuditableEntity> entry, string name, string value)
+    {
+        if (entry.Metadata.FindProperty(name) is not null)
+            entry.Property(name).CurrentValue = value;
     }
 
     private static void TryIncrementOptimisticVersion(EntityEntry<AuditableEntity> entry)
@@ -753,7 +818,7 @@ public class AuditEntitySaveChangesInterceptor(
         var tenantId = userContextService?.GetTenantId() ?? string.Empty;
 
         List<EntityEntry<IWorkflowEnabled>> statusChanges = context.ChangeTracker.Entries<IWorkflowEnabled>()
-            .Where(e => e.State is EntityState.Added or EntityState.Modified && e.Entity.IsWorkflowEnabled)
+            .Where(e => e.State is EntityState.Added or EntityState.Modified && e.Entity.IsWorkflowEnabled && !IsAnonymous(e.Entity))
             .ToList();
 
         foreach (EntityEntry<IWorkflowEnabled> entry in statusChanges)
@@ -998,6 +1063,11 @@ public class AuditEntitySaveChangesInterceptor(
             if (domainEvents.Count == 0)
                 continue;
 
+            if (IsAnonymous(entry.Entity))
+                throw new InvalidOperationException(
+                    $"SaveChanges aborted: {entry.Entity.GetType().Name} is an anonymous record and raised {domainEvents.Count} domain event(s). " +
+                    "Its outbox row would carry the record id and the moment it was written, which ties the record to the request that made it.");
+
             if (domainOutbox is not null)
             {
                 var entityId = OutboxEntityId.FromEntity(entry.Entity);
@@ -1053,7 +1123,7 @@ public class AuditEntitySaveChangesInterceptor(
         var userRoles = userContextService.GetUserRoles();
 
         var workflowEntities = context.ChangeTracker.Entries<IWorkflowEnabled>()
-            .Where(e => e.Entity.IsWorkflowEnabled)
+            .Where(e => e.Entity.IsWorkflowEnabled && !IsAnonymous(e.Entity))
             .ToList();
 
         foreach (var entry in workflowEntities)
