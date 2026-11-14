@@ -7,6 +7,7 @@ public static class WorkflowApprovalGateMetrics
     public const string MeterName = "QimErp.Shared.Common.Workflow";
     public const string ModuleStateUnknownInstrument = "workflow.approval_gate.module_state_unknown";
     public const string StateUnreadableInstrument = "workflow.approval_gate.state_unreadable";
+    public const string PresetCodeMismatchInstrument = "workflow.approval_gate.preset_code_mismatch";
 
     public const string AssumedEnabled = "assumed_enabled";
     public const string ConfigFound = "config_found";
@@ -17,7 +18,6 @@ public static class WorkflowApprovalGateMetrics
     public const string MarkerMissing = "marker_missing";
     public const string BoundKeyMissing = "bound_key_missing";
     public const string PresetCodeUnpublished = "preset_code_unpublished";
-    public const string PresetCodeMismatch = "preset_code_mismatch";
     public const string ModuleUnresolved = "module_unresolved";
 
     public const string ConfigSource = "config";
@@ -34,6 +34,10 @@ public static class WorkflowApprovalGateMetrics
         Meter.CreateCounter<long>(
             StateUnreadableInstrument,
             description: "Writes refused because workflow configuration or definitions could not be read");
+    private static readonly Counter<long> PresetCodeMismatches =
+        Meter.CreateCounter<long>(
+            PresetCodeMismatchInstrument,
+            description: "Creates refused because their preset WorkflowCode differs from the configured create workflow");
 
     internal static void RecordModuleStateUnknown(string outcome, string? module, string? entityType) =>
         ModuleStateUnknown.Add(
@@ -46,6 +50,13 @@ public static class WorkflowApprovalGateMetrics
         StateUnreadable.Add(
             1,
             new KeyValuePair<string, object?>("source", source),
+            new KeyValuePair<string, object?>("module", module ?? string.Empty),
+            new KeyValuePair<string, object?>("entity_type", entityType ?? string.Empty),
+            new KeyValuePair<string, object?>("operation", operation));
+
+    internal static void RecordPresetCodeMismatch(string? module, string? entityType, string operation) =>
+        PresetCodeMismatches.Add(
+            1,
             new KeyValuePair<string, object?>("module", module ?? string.Empty),
             new KeyValuePair<string, object?>("entity_type", entityType ?? string.Empty),
             new KeyValuePair<string, object?>("operation", operation));

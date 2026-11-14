@@ -1209,7 +1209,7 @@ public class AuditEntitySaveChangesInterceptor(
             }
 
             entityWorkflowConfig = config;
-            if (config != null && (string.IsNullOrWhiteSpace(presetCode) || IsCreateWorkflowRequired(config)))
+            if (config != null && (string.IsNullOrWhiteSpace(presetCode) || WorkflowInterceptDecisions.ConfigRequiresCreateApproval(config, null)))
             {
                 var changedFields = WorkflowFieldChangeDetector.DetectChangedFields(entry);
 
@@ -1369,7 +1369,7 @@ public class AuditEntitySaveChangesInterceptor(
                 logger.LogWarning("Workflow definition found for {EntityType} WorkflowCode={WorkflowCode} but IsActive=false. Skipping workflow initiation.",
                     entity.EntityType, workflowCode);
 
-                if (operation == "CREATE" && IsCreateWorkflowRequired(entityWorkflowConfig))
+                if (operation == "CREATE" && WorkflowInterceptDecisions.ConfigRequiresCreateApproval(entityWorkflowConfig, null))
                 {
                     throw new InvalidOperationException(
                         $"Workflow approval is required for {entity.EntityType} create (workflow code: {entityWorkflowConfig!.CreateWorkflowCode}), " +
@@ -1396,91 +1396,83 @@ public class AuditEntitySaveChangesInterceptor(
                 logger.LogDebug("Published workflow definition not found. Falling back to ShouldTriggerWorkflow check for {EntityType} {Operation}",
                     entity.EntityType, operation);
 
-                var module = GetModuleFor(entity);
-                if (string.IsNullOrWhiteSpace(module))
+                var shouldTrigger = await workflowService.ShouldTriggerWorkflow(entity, operation, gateModule);
+                logger.LogDebug("ShouldTriggerWorkflow returned {ShouldTrigger} for {EntityType} {Operation} in module {Module}",
+                    shouldTrigger, entity.EntityType, operation, gateModule);
+
+                if (shouldTrigger)
                 {
-                    throw ModuleNotConfigured(tenantId, entity.EntityType, operation);
+                    if (string.IsNullOrWhiteSpace(workflowCode))
+                    {
+                        var fallbackLookup = await configCacheService.LookupEntityConfigAsync(gateModule, entity.EntityType, tenantId);
+                        if (fallbackLookup.Status == WorkflowConfigLookupStatus.Unknown)
+                        {
+                            WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                                WorkflowApprovalGateMetrics.ConfigSource, gateModule, entity.EntityType, operation);
+                            throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);
+                        }
+
+                        workflowCode = operation == "CREATE" ? fallbackLookup.Config?.CreateWorkflowCode : null;
+                        entityWorkflowConfig ??= fallbackLookup.Config;
+                    }
+
+                    logger.LogInformation("Workflow should be triggered for {EntityType} {Operation}. Initiating workflow without EntityWorkflowStep. WorkflowCode={WorkflowCode}",
+                        entity.EntityType, operation, workflowCode);
+
+                    if (operation == "CREATE")
+                    {
+                        if (entry.Entity is AuditableEntity auditableEntity)
+                        {
+                            auditableEntity.AsDraft();
+                            logger.LogDebug("Set entity {EntityType} as Draft", entity.EntityType);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(workflowCode))
+                        {
+                            SetWorkflowCodeOnEntity(entity, workflowCode);
+                            logger.LogDebug("Set WorkflowCode={WorkflowCode} on entity {EntityType} (fallback path)", workflowCode, entity.EntityType);
+                        }
+
+                        logger.LogDebug("Calling InitiateWorkflowAsync (fallback path) for {EntityType} CREATE operation", entity.EntityType);
+
+                        await workflowService.InitiateWorkflowAsync(entity, operation);
+                        workflowInitiatedForCreate = true;
+
+                        logger.LogInformation("Successfully initiated workflow (fallback path) for {EntityType} {Operation}. WorkflowCode={WorkflowCode}, WorkflowStatus={WorkflowStatus}, CurrentWorkflowHistoryId={WorkflowHistoryId}",
+                            entity.EntityType, operation, entity.WorkflowCode, entity.WorkflowStatus, entity.CurrentWorkflowHistoryId);
+                    }
+                    else if (operation == "UPDATE" && WorkflowInterceptDecisions.ShouldInitiateWorkflowOnUpdate(entity))
+                    {
+                        if (!string.IsNullOrWhiteSpace(workflowCode))
+                        {
+                            SetWorkflowCodeOnEntity(entity, workflowCode);
+                            logger.LogDebug("Set WorkflowCode={WorkflowCode} on entity {EntityType} (fallback path)", workflowCode, entity.EntityType);
+                        }
+
+                        logger.LogDebug("Calling InitiateWorkflowAsync (fallback path) for {EntityType} UPDATE operation", entity.EntityType);
+
+                        await workflowService.InitiateWorkflowAsync(entity, operation);
+
+                        logger.LogInformation("Successfully initiated workflow (fallback path) for {EntityType} {Operation}. WorkflowCode={WorkflowCode}, WorkflowStatus={WorkflowStatus}, CurrentWorkflowHistoryId={WorkflowHistoryId}",
+                            entity.EntityType, operation, entity.WorkflowCode, entity.WorkflowStatus, entity.CurrentWorkflowHistoryId);
+                    }
                 }
                 else
                 {
-                    var shouldTrigger = await workflowService.ShouldTriggerWorkflow(entity, operation, module);
-                    logger.LogDebug("ShouldTriggerWorkflow returned {ShouldTrigger} for {EntityType} {Operation} in module {Module}",
-                        shouldTrigger, entity.EntityType, operation, module);
+                    logger.LogDebug("Workflow should not be triggered for {EntityType} {Operation}. Skipping workflow initiation.",
+                        entity.EntityType, operation);
 
-                    if (shouldTrigger)
+                    if (operation == "CREATE" && entry.Entity is AuditableEntity auditableEntity)
                     {
-                        if (string.IsNullOrWhiteSpace(workflowCode))
-                        {
-                            var fallbackLookup = await configCacheService.LookupEntityConfigAsync(module, entity.EntityType, tenantId);
-                            if (fallbackLookup.Status == WorkflowConfigLookupStatus.Unknown)
-                            {
-                                WorkflowApprovalGateMetrics.RecordStateUnreadable(
-                                    WorkflowApprovalGateMetrics.ConfigSource, module, entity.EntityType, operation);
-                                throw new WorkflowApprovalStateUnavailableException(tenantId, module, entity.EntityType, operation);
-                            }
-
-                            workflowCode = operation == "CREATE" ? fallbackLookup.Config?.CreateWorkflowCode : null;
-                            entityWorkflowConfig ??= fallbackLookup.Config;
-                        }
-
-                        logger.LogInformation("Workflow should be triggered for {EntityType} {Operation}. Initiating workflow without EntityWorkflowStep. WorkflowCode={WorkflowCode}",
-                            entity.EntityType, operation, workflowCode);
-
-                        if (operation == "CREATE")
-                        {
-                            if (entry.Entity is AuditableEntity auditableEntity)
-                            {
-                                auditableEntity.AsDraft();
-                                logger.LogDebug("Set entity {EntityType} as Draft", entity.EntityType);
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(workflowCode))
-                            {
-                                SetWorkflowCodeOnEntity(entity, workflowCode);
-                                logger.LogDebug("Set WorkflowCode={WorkflowCode} on entity {EntityType} (fallback path)", workflowCode, entity.EntityType);
-                            }
-
-                            logger.LogDebug("Calling InitiateWorkflowAsync (fallback path) for {EntityType} CREATE operation", entity.EntityType);
-
-                            await workflowService.InitiateWorkflowAsync(entity, operation);
-                            workflowInitiatedForCreate = true;
-
-                            logger.LogInformation("Successfully initiated workflow (fallback path) for {EntityType} {Operation}. WorkflowCode={WorkflowCode}, WorkflowStatus={WorkflowStatus}, CurrentWorkflowHistoryId={WorkflowHistoryId}",
-                                entity.EntityType, operation, entity.WorkflowCode, entity.WorkflowStatus, entity.CurrentWorkflowHistoryId);
-                        }
-                        else if (operation == "UPDATE" && WorkflowInterceptDecisions.ShouldInitiateWorkflowOnUpdate(entity))
-                        {
-                            if (!string.IsNullOrWhiteSpace(workflowCode))
-                            {
-                                SetWorkflowCodeOnEntity(entity, workflowCode);
-                                logger.LogDebug("Set WorkflowCode={WorkflowCode} on entity {EntityType} (fallback path)", workflowCode, entity.EntityType);
-                            }
-
-                            logger.LogDebug("Calling InitiateWorkflowAsync (fallback path) for {EntityType} UPDATE operation", entity.EntityType);
-
-                            await workflowService.InitiateWorkflowAsync(entity, operation);
-
-                            logger.LogInformation("Successfully initiated workflow (fallback path) for {EntityType} {Operation}. WorkflowCode={WorkflowCode}, WorkflowStatus={WorkflowStatus}, CurrentWorkflowHistoryId={WorkflowHistoryId}",
-                                entity.EntityType, operation, entity.WorkflowCode, entity.WorkflowStatus, entity.CurrentWorkflowHistoryId);
-                        }
-                    }
-                    else
-                    {
-                        logger.LogDebug("Workflow should not be triggered for {EntityType} {Operation}. Skipping workflow initiation.",
-                            entity.EntityType, operation);
-
-                        if (operation == "CREATE" && entry.Entity is AuditableEntity auditableEntity)
-                        {
-                            auditableEntity.AsActive();
-                            logger.LogDebug("No workflow trigger configured for {EntityType} create. Keeping entity active.", entity.EntityType);
-                        }
+                        auditableEntity.AsActive();
+                        logger.LogDebug("No workflow trigger configured for {EntityType} create. Keeping entity active.", entity.EntityType);
                     }
                 }
             }
 
             if (operation == "CREATE" && !workflowInitiatedForCreate && entry.Entity is AuditableEntity createAuditableEntity)
             {
-                if (IsCreateWorkflowRequired(entityWorkflowConfig))
+                if (WorkflowInterceptDecisions.ConfigRequiresCreateApproval(entityWorkflowConfig, null))
                 {
                     throw new InvalidOperationException(
                         $"Workflow approval is required for {entity.EntityType} create (workflow code: {entityWorkflowConfig!.CreateWorkflowCode}), " +
@@ -1491,6 +1483,15 @@ public class AuditEntitySaveChangesInterceptor(
                 logger.LogDebug("Create operation for {EntityType} finished without workflow initiation. Enforced active status.", entity.EntityType);
             }
         }
+
+        foreach (var created in workflowEntities.Where(e => e.State == EntityState.Added))
+        {
+            if (created.Entity.WorkflowStatus == WorkflowStatus.NotStarted
+                && !string.IsNullOrWhiteSpace(created.Entity.WorkflowCode))
+            {
+                created.Entity.WorkflowCode = null;
+            }
+        }
     }
 
     private WorkflowPresetCodeMismatchException PresetCodeMismatch(
@@ -1499,8 +1500,7 @@ public class AuditEntitySaveChangesInterceptor(
         logger.LogError(
             "{EntityType} create carries WorkflowCode {PresetCode} but tenant {TenantId} requires {ConfiguredCode} — refusing",
             entityType, presetCode, tenantId, configuredCode);
-        WorkflowApprovalGateMetrics.RecordStateUnreadable(
-            WorkflowApprovalGateMetrics.PresetCodeMismatch, module, entityType, "CREATE");
+        WorkflowApprovalGateMetrics.RecordPresetCodeMismatch(module, entityType, "CREATE");
         return new WorkflowPresetCodeMismatchException(tenantId, module, entityType, presetCode, configuredCode);
     }
 
@@ -1513,10 +1513,6 @@ public class AuditEntitySaveChangesInterceptor(
             WorkflowApprovalGateMetrics.ModuleUnresolved, null, entityType, operation);
         return new WorkflowApprovalStateUnavailableException(tenantId, null, entityType, operation);
     }
-
-    private static bool IsCreateWorkflowRequired([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] EntityWorkflowConfig? config) =>
-        config?.EnableWorkflowForCreate == true
-        && !string.IsNullOrWhiteSpace(config.CreateWorkflowCode);
 
     private string ResolveTenantIdForEntity(IWorkflowEnabled entity)
     {

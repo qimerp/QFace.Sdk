@@ -113,8 +113,7 @@ public sealed class WorkflowModuleApprovalGate(
                 logger.LogError(
                     "[WorkflowModuleApprovalGate] {EntityType} create carries WorkflowCode {PresetCode} but tenant {TenantId} requires {ConfiguredCode} — refusing the write",
                     entityType, workflowCode, tenantId, lookup.Config.CreateWorkflowCode);
-                WorkflowApprovalGateMetrics.RecordStateUnreadable(
-                    WorkflowApprovalGateMetrics.PresetCodeMismatch, module, entityType, operation);
+                WorkflowApprovalGateMetrics.RecordPresetCodeMismatch(module, entityType, operation);
                 throw new WorkflowPresetCodeMismatchException(
                     tenantId, module, entityType, workflowCode, lookup.Config.CreateWorkflowCode!);
             }

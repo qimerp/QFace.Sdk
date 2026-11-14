@@ -246,7 +246,7 @@ public class WorkflowApprovalFailSafeInterceptorTests
         (await save.Should().ThrowAsync<WorkflowPresetCodeMismatchException>()).Which.EntityType.Should().Be(nameof(TestWorkflowEntity));
         (await harness.Context.Entities.CountAsync()).Should().Be(0);
         (await harness.Context.OutboxMessages.CountAsync()).Should().Be(0);
-        metrics.Unreadable.Should().Contain(m => m.Source == WorkflowApprovalGateMetrics.PresetCodeMismatch && m.EntityType == nameof(TestWorkflowEntity));
+        metrics.PresetMismatches.Should().Contain(m => m.EntityType == nameof(TestWorkflowEntity) && m.Operation == "CREATE");
     }
 
     [Theory]
@@ -276,8 +276,10 @@ public class WorkflowApprovalFailSafeInterceptorTests
         {
             await save();
             entity.WorkflowStatus.Should().NotBe(WorkflowStatus.InProgress);
+            entity.WorkflowCode.Should().BeNull();
             (await ApprovalRowCountAsync(harness)).Should().Be(0);
-            (await harness.Context.Entities.CountAsync()).Should().Be(1);
+            harness.Context.ChangeTracker.Clear();
+            (await harness.Context.Entities.SingleAsync()).WorkflowCode.Should().BeNull();
         }
     }
 
@@ -325,6 +327,7 @@ public class WorkflowApprovalFailSafeInterceptorTests
         {
             await save();
             entity.DataStatus.Should().Be(DataState.Active);
+            entity.WorkflowCode.Should().BeNull();
             (await ApprovalRowCountAsync(harness)).Should().Be(0);
         }
     }
@@ -431,6 +434,7 @@ public class WorkflowApprovalFailSafeInterceptorTests
         await harness.Context.SaveChangesAsync();
 
         entity.WorkflowStatus.Should().Be(WorkflowStatus.InProgress);
+        entity.WorkflowCode.Should().Be("SEEDED-WF");
         (await ApprovalRowCountAsync(harness)).Should().Be(expectedRows);
     }
 

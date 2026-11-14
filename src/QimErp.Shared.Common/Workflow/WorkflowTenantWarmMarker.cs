@@ -30,7 +30,9 @@ public sealed class WorkflowTenantWarmMarker
     public bool IsBoundSetPresent => Version == CurrentVersion && Bound is not null && !Bound.Any(pair => pair is null);
 
     public bool IsBound(string module, string entityType) =>
-        Bound?.Any(pair => !string.IsNullOrEmpty(pair)
-            && (pair.EndsWith(":" + entityType, StringComparison.OrdinalIgnoreCase)
-                || pair.Equals(entityType, StringComparison.OrdinalIgnoreCase))) == true;
+        Bound?.Any(pair => !string.IsNullOrWhiteSpace(pair) && MatchesEntityType(pair.Trim(), entityType)) == true;
+
+    private static bool MatchesEntityType(string pair, string entityType) =>
+        pair.EndsWith(":" + entityType, StringComparison.OrdinalIgnoreCase)
+        || pair.Equals(entityType, StringComparison.OrdinalIgnoreCase);
 }

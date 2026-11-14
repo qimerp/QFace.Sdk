@@ -81,9 +81,10 @@ needed. A missing workflow configuration or definition key proves "nothing bound
 tenant warm marker (`qface:qimerp:workflow:warm:{tenantId}`) is a version 2 marker
 (`{ "warmedAt": ..., "version": 2, "bound": ["{module}:{entityType}", ...] }`), younger than
 `Workflow:WarmMarkerMaxAge` (an `hh:mm:ss` duration, at most and by default 48h), not dated more
-than 5 minutes in the future, and no `bound` entry names the entity type. Entries are matched on
-the part after the colon only, because Platform's module part can be a template category (for
-example `Leave`) that differs from the service's `Workflow:Module` (`HR`).
+than 5 minutes in the future, and no `bound` entry names the entity type. An entry matches when it
+equals the entity type or ends with `:{entityType}`, case-insensitive; the module part is ignored
+because Platform's can be a template category (for example `Leave`) that differs from the service's
+`Workflow:Module` (`HR`).
 
 Platform must ship these, in this order, before any service bumps the package:
 
@@ -109,7 +110,9 @@ module keys with Platform's.
 A 503 (`WorkflowApprovalStateUnavailableException`, with `Retry-After`) means the approval state
 could not be read and the request can be retried. A 409 (`WorkflowPresetCodeMismatchException`)
 is permanent: the record was submitted with a `WorkflowCode` other than its configured create
-workflow, so it must be fixed by the caller, not retried.
+workflow, so it must be fixed by the caller, not retried. Refusals are counted on the
+`QimErp.Shared.Common.Workflow` meter: `workflow.approval_gate.state_unreadable` for the 503 cases
+and `workflow.approval_gate.preset_code_mismatch` for the 409.
 
 ## Consumers: test suites
 

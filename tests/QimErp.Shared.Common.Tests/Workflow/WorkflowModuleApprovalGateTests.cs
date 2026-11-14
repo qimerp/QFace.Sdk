@@ -534,7 +534,8 @@ public class WorkflowModuleApprovalGateTests
         var thrown = await act.Should().ThrowAsync<WorkflowPresetCodeMismatchException>();
         thrown.Which.EntityType.Should().Be(EntityType);
         thrown.Which.Message.Should().Contain(EntityType).And.NotContain(TenantId).And.NotContain("OLD-WF");
-        metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.PresetCodeMismatch, Module, EntityType, "CREATE"));
+        metrics.PresetMismatches.Should().Contain((Module, EntityType, "CREATE"));
+        metrics.Unreadable.Should().NotContain(m => m.EntityType == EntityType && m.Operation == "CREATE" && m.Source == "preset_code_mismatch");
     }
 
     [Theory]
@@ -592,8 +593,11 @@ public class WorkflowModuleApprovalGateTests
     [Theory]
     [InlineData("GL:Ledger:Entry", true)]
     [InlineData("ledger:entry", true)]
+    [InlineData("  GL:Ledger:Entry  ", true)]
+    [InlineData(" Ledger:Entry\t", true)]
     [InlineData("GL:Entry", false)]
     [InlineData("", false)]
+    [InlineData("   ", false)]
     public async Task WarmMarker_BoundEntriesMatchWholeEntityTypeIncludingColons(string entry, bool bound)
     {
         var redis = new InMemoryGlobalRedis();
@@ -1046,6 +1050,16 @@ public class WorkflowModuleApprovalGateTests
         private readonly MeterListener _listener = new();
         private readonly List<(string Outcome, string Module, string EntityType)> _outcomes = [];
         private readonly List<(string Source, string Module, string EntityType, string Operation)> _unreadable = [];
+        private readonly List<(string Module, string EntityType, string Operation)> _presetMismatches = [];
+
+        public IReadOnlyList<(string Module, string EntityType, string Operation)> PresetMismatches
+        {
+            get
+            {
+                lock (_outcomes)
+                    return _presetMismatches.ToList();
+            }
+        }
 
         public GateMetricRecorder()
         {
@@ -1062,7 +1076,10 @@ public class WorkflowModuleApprovalGateTests
 
                 lock (_outcomes)
                 {
-                    if (instrument.Name == WorkflowApprovalGateMetrics.StateUnreadableInstrument)
+                    if (instrument.Name == WorkflowApprovalGateMetrics.PresetCodeMismatchInstrument)
+                        _presetMismatches.Add((values.GetValueOrDefault("module", ""), values.GetValueOrDefault("entity_type", ""),
+                            values.GetValueOrDefault("operation", "")));
+                    else if (instrument.Name == WorkflowApprovalGateMetrics.StateUnreadableInstrument)
                         _unreadable.Add((values.GetValueOrDefault("source", ""), values.GetValueOrDefault("module", ""),
                             values.GetValueOrDefault("entity_type", ""), values.GetValueOrDefault("operation", "")));
                     else
