@@ -408,6 +408,7 @@ public class WorkflowModuleApprovalGateTests
         clock.Now = clock.Now.AddSeconds(6);
         (await provider.LookupPublishedDefinitionByEntityTypeAsync(TenantId, EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Found);
 
+        clock.Now = clock.Now.AddMinutes(10);
         redis.Down = true;
         (await provider.LookupPublishedDefinitionByEntityTypeAsync(TenantId, EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Found);
         (await provider.LookupPublishedDefinitionAsync(TenantId, "WF", EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Unknown);
