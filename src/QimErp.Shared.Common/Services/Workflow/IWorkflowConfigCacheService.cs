@@ -18,4 +18,11 @@ public interface IWorkflowConfigCacheService
         string entityType,
         string operation,
         string? tenantId = null);
+
+    /// <remarks>The default implementation cannot report <see cref="WorkflowConfigLookupStatus.Unknown"/>; override it.</remarks>
+    async Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null)
+    {
+        var config = await GetEntityConfigAsync(module, entityType, tenantId);
+        return config is null ? WorkflowConfigLookup.Absent : WorkflowConfigLookup.Found(config);
+    }
 }

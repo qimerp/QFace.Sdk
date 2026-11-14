@@ -26,8 +26,11 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
         _logger = logger;
     }
 
-    public Task<EntityWorkflowConfig?> GetEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
-        GetEntityConfigInternalAsync(ResolveTenantId(tenantId), module, entityType);
+    public async Task<EntityWorkflowConfig?> GetEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
+        (await LookupEntityConfigAsync(module, entityType, tenantId)).Config;
+
+    public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
+        LookupEntityConfigInternalAsync(ResolveTenantId(tenantId), module, entityType);
 
     public async Task<bool> IsWorkflowEnabledAsync(string module, string entityType, string operation, string? tenantId = null)
     {
@@ -71,14 +74,14 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
         };
     }
 
-    private async Task<EntityWorkflowConfig?> GetEntityConfigInternalAsync(string tenantId, string module, string entityType)
+    private async Task<WorkflowConfigLookup> LookupEntityConfigInternalAsync(string tenantId, string module, string entityType)
     {
         if (string.IsNullOrWhiteSpace(tenantId))
         {
             _logger.LogWarning(
                 "Cannot load workflow config — TenantId is empty for module={Module}, entity={EntityType}",
                 module, entityType);
-            return null;
+            return WorkflowConfigLookup.Absent;
         }
 
         var cacheKey = WorkflowDefinitionCacheKeys.Configuration(tenantId, module, entityType);
@@ -86,29 +89,36 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
         if (_localCache.TryGetValue(cacheKey, out var cached))
         {
             _logger.LogDebug("L1 hit for workflow config key: {Key}", cacheKey);
-            return cached;
+            return cached is null ? WorkflowConfigLookup.Absent : WorkflowConfigLookup.Found(cached);
         }
 
         try
         {
-            var config = await _cache.GetAsync<EntityWorkflowConfig>(cacheKey);
-            _localCache[cacheKey] = config;
-
-            if (config == null)
+            var read = await _cache.ReadEntryAsync<EntityWorkflowConfig>(cacheKey);
+            switch (read.Status)
             {
-                _logger.LogDebug(
-                    "No workflow configuration found in cache for tenant={TenantId}, module={Module}, entity={EntityType}",
-                    tenantId, module, entityType);
+                case CacheReadStatus.Hit when read.Value is not null:
+                    _localCache[cacheKey] = read.Value;
+                    return WorkflowConfigLookup.Found(read.Value);
+                case CacheReadStatus.Miss:
+                    _localCache[cacheKey] = null;
+                    _logger.LogDebug(
+                        "No workflow configuration found in cache for tenant={TenantId}, module={Module}, entity={EntityType}",
+                        tenantId, module, entityType);
+                    return WorkflowConfigLookup.Absent;
+                default:
+                    _logger.LogWarning(
+                        "Workflow configuration could not be read from cache for tenant={TenantId}, module={Module}, entity={EntityType}",
+                        tenantId, module, entityType);
+                    return WorkflowConfigLookup.Unknown;
             }
-
-            return config;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "Error retrieving workflow configuration from cache for tenant={TenantId}, module={Module}, entity={EntityType}",
                 tenantId, module, entityType);
-            return null;
+            return WorkflowConfigLookup.Unknown;
         }
     }
 

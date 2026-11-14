@@ -444,7 +444,11 @@ internal sealed class InterceptorE2EHarness : IAsyncDisposable
             _inner ?? throw new InvalidOperationException("Outbox not bound.");
     }
 
-    public InterceptorE2EHarness(string tenantId, string moduleName)
+    public InterceptorE2EHarness(
+        string tenantId,
+        string moduleName,
+        ITenantModuleAccessService? moduleAccess = null,
+        bool registerApprovalGate = false)
     {
         ConfigCache = new FakeWorkflowConfigCacheService();
         DefinitionProvider = new FakeWorkflowDefinitionProvider(tenantId);
@@ -469,7 +473,9 @@ internal sealed class InterceptorE2EHarness : IAsyncDisposable
         services.AddSingleton<IWorkflowDefinitionProvider>(sp => sp.GetRequiredService<FakeWorkflowDefinitionProvider>());
         services.AddSingleton(Bridge);
         services.AddSingleton<IWorkflowTriggerBridge>(sp => sp.GetRequiredService<RecordingWorkflowTriggerBridge>());
-        services.AddSingleton<ITenantModuleAccessService>(new FakeTenantModuleAccessService());
+        services.AddSingleton<ITenantModuleAccessService>(moduleAccess ?? new FakeTenantModuleAccessService());
+        if (registerApprovalGate)
+            services.AddSingleton<IWorkflowModuleApprovalGate, WorkflowModuleApprovalGate>();
         services.AddSingleton<IWorkflowService, WorkflowService>();
         services.AddSingleton<IOutbox>(bound);
         services.Configure<OutboxOptions>(_ => { });
@@ -556,6 +562,18 @@ internal sealed class FakeWorkflowConfigCacheService : IWorkflowConfigCacheServi
 {
     private readonly Dictionary<(string Module, string EntityType), EntityWorkflowConfig> _configs = new();
 
+    public bool Unreadable { get; set; }
+
+    public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null)
+    {
+        if (Unreadable)
+            return Task.FromResult(WorkflowConfigLookup.Unknown);
+
+        return Task.FromResult(_configs.TryGetValue((module, entityType), out var config)
+            ? WorkflowConfigLookup.Found(config)
+            : WorkflowConfigLookup.Absent);
+    }
+
     public void SetConfig(string module, EntityWorkflowConfig config, string entityType = nameof(TestWorkflowEntity))
     {
         _configs[(module, entityType)] = config;
@@ -563,13 +581,16 @@ internal sealed class FakeWorkflowConfigCacheService : IWorkflowConfigCacheServi
 
     public Task<EntityWorkflowConfig?> GetEntityConfigAsync(string module, string entityType, string? tenantId = null)
     {
+        if (Unreadable)
+            return Task.FromResult<EntityWorkflowConfig?>(null);
+
         _configs.TryGetValue((module, entityType), out var config);
         return Task.FromResult<EntityWorkflowConfig?>(config);
     }
 
     public Task<bool> IsWorkflowEnabledAsync(string module, string entityType, string operation, string? tenantId = null)
     {
-        if (!_configs.TryGetValue((module, entityType), out var config))
+        if (Unreadable || !_configs.TryGetValue((module, entityType), out var config))
             return Task.FromResult(false);
 
         return Task.FromResult(operation.ToUpperInvariant() switch
@@ -583,7 +604,7 @@ internal sealed class FakeWorkflowConfigCacheService : IWorkflowConfigCacheServi
 
     public Task<string?> GetWorkflowCodeAsync(string module, string entityType, string operation, string? tenantId = null)
     {
-        if (!_configs.TryGetValue((module, entityType), out var config))
+        if (Unreadable || !_configs.TryGetValue((module, entityType), out var config))
             return Task.FromResult<string?>(null);
 
         return Task.FromResult(operation.ToUpperInvariant() switch
@@ -638,6 +659,26 @@ internal sealed class RecordingWorkflowTriggerBridge : IWorkflowTriggerBridge
         Messages.Add(message);
         return Task.FromResult(true);
     }
+}
+
+internal sealed class ScriptedModuleAccessService(ModuleAccess access) : ITenantModuleAccessService
+{
+    public Task<bool> IsModuleEnabledAsync(
+        string? tenantId,
+        string moduleKey,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(access == ModuleAccess.Enabled);
+
+    public Task<IReadOnlyList<string>?> GetInstalledModuleKeysAsync(
+        string? tenantId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>?>(access == ModuleAccess.Unknown ? null : []);
+
+    public Task<ModuleAccess> GetModuleAccessAsync(
+        string? tenantId,
+        string moduleKey,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(access);
 }
 
 internal sealed class FakeTenantModuleAccessService(bool isModuleEnabled = true) : ITenantModuleAccessService

@@ -14,31 +14,39 @@ public sealed class TenantModuleAccessService(
     public async Task<bool> IsModuleEnabledAsync(
         string? tenantId,
         string moduleKey,
+        CancellationToken cancellationToken = default) =>
+        await GetModuleAccessAsync(tenantId, moduleKey, cancellationToken) == ModuleAccess.Enabled;
+
+    public async Task<ModuleAccess> GetModuleAccessAsync(
+        string? tenantId,
+        string moduleKey,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(tenantId))
         {
-            return false;
+            return ModuleAccess.NotInstalled;
         }
 
         // An empty moduleKey means "no module required", not "unknown tenant".
         if (string.IsNullOrWhiteSpace(moduleKey))
         {
-            return true;
+            return ModuleAccess.Enabled;
         }
 
         if (BaseModel.IncludedModuleKeys.Contains(moduleKey, StringComparer.OrdinalIgnoreCase))
         {
-            return true;
+            return ModuleAccess.Enabled;
         }
 
-        var installed = await GetInstalledModuleKeysAsync(tenantId, cancellationToken);
-        if (installed is null)
+        var snapshot = await ReadSnapshotAsync(tenantId);
+        if (snapshot is null)
         {
-            return false;
+            return ModuleAccess.Unknown;
         }
 
-        return ModuleGuard.IsExplicitlySelected(installed, moduleKey);
+        return ModuleGuard.IsExplicitlySelected(snapshot.InstalledModuleKeys, moduleKey)
+            ? ModuleAccess.Enabled
+            : ModuleAccess.NotInstalled;
     }
 
     public async Task<IReadOnlyList<string>?> GetInstalledModuleKeysAsync(
@@ -50,6 +58,12 @@ public sealed class TenantModuleAccessService(
             return null;
         }
 
+        var snapshot = await ReadSnapshotAsync(tenantId);
+        return snapshot?.InstalledModuleKeys;
+    }
+
+    private async Task<TenantModuleSnapshotEntry?> ReadSnapshotAsync(string tenantId)
+    {
         if (!Guid.TryParse(tenantId, out var tenantGuid))
         {
             return null;
@@ -59,17 +73,21 @@ public sealed class TenantModuleAccessService(
         if (httpContextAccessor.HttpContext?.Items.TryGetValue(itemKey, out var cached) == true
             && cached is TenantModuleSnapshotEntry cachedSnapshot)
         {
-            return cachedSnapshot.InstalledModuleKeys;
+            return cachedSnapshot;
         }
 
-        var snapshot = await cache.GetAsync<TenantModuleSnapshotEntry>(
+        var read = await cache.ReadEntryAsync<TenantModuleSnapshotEntry>(
             SharedCacheKeys.TenantModuleSnapshot(tenantGuid));
+        if (read.Status != CacheReadStatus.Hit || read.Value is null)
+        {
+            return null;
+        }
 
         if (httpContextAccessor.HttpContext is not null)
         {
-            httpContextAccessor.HttpContext.Items[itemKey] = snapshot;
+            httpContextAccessor.HttpContext.Items[itemKey] = read.Value;
         }
 
-        return snapshot?.InstalledModuleKeys;
+        return read.Value;
     }
 }

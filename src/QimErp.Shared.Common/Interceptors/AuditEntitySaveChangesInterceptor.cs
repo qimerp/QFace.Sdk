@@ -1141,14 +1141,23 @@ public class AuditEntitySaveChangesInterceptor(
 
             var tenantId = ResolveTenantIdForEntity(entity);
 
-            if (approvalGate is not null
-                && !await approvalGate.IsApprovalModuleEnabledAsync(tenantId, cancellationToken))
+            var gateModule = GetModuleFor(entity);
+            var approvalState = approvalGate is null
+                ? WorkflowApprovalGateState.On
+                : await approvalGate.GetApprovalStateAsync(
+                    tenantId, gateModule, entity.EntityType, cancellationToken);
+
+            if (approvalState == WorkflowApprovalGateState.Unavailable)
+                throw new WorkflowApprovalStateUnavailableException(
+                    tenantId, gateModule, entity.EntityType, operation);
+
+            if (approvalState == WorkflowApprovalGateState.Off)
             {
                 if (operation == "CREATE" && entry.Entity is AuditableEntity moduleOffAuditable)
                 {
                     moduleOffAuditable.AsActive();
                     logger.LogDebug(
-                        "Workflow module not installed for tenant {TenantId} — keeping {EntityType} active on create",
+                        "Approval not required for tenant {TenantId} — keeping {EntityType} active on create",
                         tenantId, entity.EntityType);
                 }
 
@@ -1175,7 +1184,11 @@ public class AuditEntitySaveChangesInterceptor(
                 }
                 else
                 {
-                    var config = await configCacheService.GetEntityConfigAsync(module, entity.EntityType, tenantId);
+                    var configLookup = await configCacheService.LookupEntityConfigAsync(module, entity.EntityType, tenantId);
+                    if (configLookup.Status == WorkflowConfigLookupStatus.Unknown)
+                        throw new WorkflowApprovalStateUnavailableException(tenantId, module, entity.EntityType, operation);
+
+                    var config = configLookup.Config;
                     if (config != null)
                     {
                         entityWorkflowConfig = config;

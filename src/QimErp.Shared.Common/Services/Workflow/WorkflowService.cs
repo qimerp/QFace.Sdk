@@ -3,7 +3,6 @@ using QimErp.Shared.Common.Options;
 using QimErp.Shared.Common.Services.MultiTenancy;
 
 using QimErp.Shared.Common.Services.TenantSetup;
-using QimErp.Shared.Common.TenantSetup;
 
 namespace QimErp.Shared.Common.Services.Workflow;
 
@@ -25,14 +24,22 @@ public class WorkflowService(
             string entityType = entity.EntityType;
             var tenantId = ResolveTenantId(entity);
 
-            if (!await moduleAccess.IsModuleEnabledAsync(tenantId, ModuleKeys.Workflow))
-                return false;
-
             if (string.IsNullOrWhiteSpace(module))
             {
                 logger.LogDebug("Module not provided for ShouldTriggerWorkflow. Skipping workflow configuration check for {EntityType}", entityType);
                 return false;
             }
+
+            var gateState = await WorkflowModuleApprovalGate.EvaluateAsync(
+                moduleAccess, configCacheService, logger, tenantId, module, entityType, CancellationToken.None);
+            if (gateState == WorkflowApprovalGateState.Unavailable)
+                throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
+            if (gateState == WorkflowApprovalGateState.Off)
+                return false;
+
+            var lookup = await configCacheService.LookupEntityConfigAsync(module, entityType, tenantId);
+            if (lookup.Status == WorkflowConfigLookupStatus.Unknown)
+                throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
 
             if (!await configCacheService.IsWorkflowEnabledAsync(module, entityType, operation, tenantId))
                 return false;
@@ -44,7 +51,7 @@ public class WorkflowService(
 
             return WorkflowTriggerConditionEvaluator.EvaluateAll(entity, conditions);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not WorkflowApprovalStateUnavailableException)
         {
             logger.LogError(ex, "Error evaluating workflow trigger for Module: {Module}, EntityType: {EntityType}, Operation: {Operation}", module, entity.EntityType, operation);
             return false;

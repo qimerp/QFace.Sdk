@@ -826,7 +826,8 @@ public static class SharedServiceCollectionExtensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter(WorkflowApprovalGateMetrics.MeterName);
             })
             .WithTracing(tracing =>
             {
