@@ -2,7 +2,10 @@ namespace QimErp.Shared.Common.Services.TenantSetup;
 
 public interface ITenantModuleAccessService
 {
-    /// <summary>Fails closed: an unknown module state reports false.</summary>
+    /// <summary>
+    /// HTTP module gating only. An unknown module state reports false, which fails OPEN for approvals;
+    /// approval decisions must use <c>IWorkflowModuleApprovalGate.GetApprovalStateAsync</c>.
+    /// </summary>
     Task<bool> IsModuleEnabledAsync(string? tenantId, string moduleKey, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<string>?> GetInstalledModuleKeysAsync(

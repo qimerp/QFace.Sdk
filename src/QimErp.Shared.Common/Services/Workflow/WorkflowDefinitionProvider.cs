@@ -14,42 +14,35 @@ public class WorkflowDefinitionProvider(
         string tenantId,
         string workflowCode,
         string entityType,
+        CancellationToken cancellationToken = default) =>
+        (await LookupPublishedDefinitionAsync(tenantId, workflowCode, entityType, cancellationToken)).Definition;
+
+    public async Task<PublishedWorkflowDefinition?> GetPublishedDefinitionByEntityTypeAsync(
+        string tenantId,
+        string entityType,
+        CancellationToken cancellationToken = default) =>
+        (await LookupPublishedDefinitionByEntityTypeAsync(tenantId, entityType, cancellationToken)).Definition;
+
+    public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionAsync(
+        string tenantId,
+        string workflowCode,
+        string entityType,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(tenantId))
         {
             logger.LogWarning("Cannot load workflow definition — TenantId is empty for WorkflowCode={WorkflowCode}",
                 workflowCode);
-            return null;
+            return Task.FromResult(WorkflowDefinitionLookup.Absent);
         }
 
-        var cacheKey = WorkflowDefinitionCacheKeys.PublishedDefinition(tenantId, workflowCode, entityType);
-
-        try
-        {
-            var cached = await cache.GetAsync<PublishedWorkflowDefinition>(cacheKey);
-            if (cached != null)
-            {
-                logger.LogDebug("Cache hit for workflow definition tenant={TenantId}, code={WorkflowCode}",
-                    tenantId, workflowCode);
-                return cached;
-            }
-
-            logger.LogDebug(
-                "No published workflow definition in cache for tenant={TenantId}, code={WorkflowCode}, entity={EntityType}",
-                tenantId, workflowCode, entityType);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "Error reading workflow definition from cache for tenant={TenantId}, code={WorkflowCode}",
-                tenantId, workflowCode);
-            return null;
-        }
+        return ReadAsync(
+            WorkflowDefinitionCacheKeys.PublishedDefinition(tenantId, workflowCode, entityType),
+            tenantId,
+            $"code={workflowCode}, entity={entityType}");
     }
 
-    public async Task<PublishedWorkflowDefinition?> GetPublishedDefinitionByEntityTypeAsync(
+    public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionByEntityTypeAsync(
         string tenantId,
         string entityType,
         CancellationToken cancellationToken = default)
@@ -58,32 +51,38 @@ public class WorkflowDefinitionProvider(
         {
             logger.LogWarning("Cannot load workflow definition — TenantId is empty for EntityType={EntityType}",
                 entityType);
-            return null;
+            return Task.FromResult(WorkflowDefinitionLookup.Absent);
         }
 
-        var cacheKey = WorkflowDefinitionCacheKeys.PublishedDefinitionByEntityType(tenantId, entityType);
+        return ReadAsync(
+            WorkflowDefinitionCacheKeys.PublishedDefinitionByEntityType(tenantId, entityType),
+            tenantId,
+            $"entity={entityType}");
+    }
 
+    private async Task<WorkflowDefinitionLookup> ReadAsync(string cacheKey, string tenantId, string target)
+    {
         try
         {
-            var cached = await cache.GetAsync<PublishedWorkflowDefinition>(cacheKey);
-            if (cached != null)
+            var read = await cache.ReadEntryAsync<PublishedWorkflowDefinition>(cacheKey);
+            switch (read.Status)
             {
-                logger.LogDebug("Cache hit for workflow definition by entity tenant={TenantId}, entity={EntityType}",
-                    tenantId, entityType);
-                return cached;
+                case CacheReadStatus.Hit when read.Value is not null:
+                    logger.LogDebug("Cache hit for workflow definition tenant={TenantId}, {Target}", tenantId, target);
+                    return WorkflowDefinitionLookup.Found(read.Value);
+                case CacheReadStatus.Miss:
+                    logger.LogDebug("No published workflow definition in cache for tenant={TenantId}, {Target}", tenantId, target);
+                    return WorkflowDefinitionLookup.Absent;
+                default:
+                    logger.LogWarning(
+                        "Workflow definition could not be read from cache for tenant={TenantId}, {Target}", tenantId, target);
+                    return WorkflowDefinitionLookup.Unknown;
             }
-
-            logger.LogDebug(
-                "No published workflow definition in cache for tenant={TenantId}, entity={EntityType}",
-                tenantId, entityType);
-            return null;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex,
-                "Error reading workflow definition from cache for tenant={TenantId}, entity={EntityType}",
-                tenantId, entityType);
-            return null;
+            logger.LogError(ex, "Error reading workflow definition from cache for tenant={TenantId}, {Target}", tenantId, target);
+            return WorkflowDefinitionLookup.Unknown;
         }
     }
 }

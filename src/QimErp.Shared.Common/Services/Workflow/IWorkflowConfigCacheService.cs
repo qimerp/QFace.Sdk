@@ -7,12 +7,16 @@ namespace QimErp.Shared.Common.Services.Workflow;
 /// </summary>
 public interface IWorkflowConfigCacheService
 {
+    [Obsolete(WorkflowConfigCacheObsolete.Message)]
     Task<EntityWorkflowConfig?> GetEntityConfigAsync(string module, string entityType, string? tenantId = null);
 
+    [Obsolete(WorkflowConfigCacheObsolete.Message)]
     Task<bool> IsWorkflowEnabledAsync(string module, string entityType, string operation, string? tenantId = null);
 
+    [Obsolete(WorkflowConfigCacheObsolete.Message)]
     Task<string?> GetWorkflowCodeAsync(string module, string entityType, string operation, string? tenantId = null);
 
+    [Obsolete(WorkflowConfigCacheObsolete.Message)]
     Task<List<WorkflowTriggerCondition>> GetTriggerConditionsAsync(
         string module,
         string entityType,
@@ -22,7 +26,16 @@ public interface IWorkflowConfigCacheService
     /// <remarks>The default implementation cannot report <see cref="WorkflowConfigLookupStatus.Unknown"/>; override it.</remarks>
     async Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null)
     {
+#pragma warning disable CS0618 // Compatibility default for implementations that predate the lookup.
         var config = await GetEntityConfigAsync(module, entityType, tenantId);
+#pragma warning restore CS0618
         return config is null ? WorkflowConfigLookup.Absent : WorkflowConfigLookup.Found(config);
     }
+}
+
+public static class WorkflowConfigCacheObsolete
+{
+    public const string Message =
+        "Not safe for approval decisions: a read failure reads as 'no approval'. " +
+        "Use IWorkflowModuleApprovalGate.GetApprovalStateAsync / LookupEntityConfigAsync.";
 }

@@ -49,12 +49,36 @@ public class WorkflowModuleApprovalGateTests
         (await gate.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.On);
     }
 
+    [Theory]
+    [InlineData(WorkflowDefinitionLookupStatus.Found, WorkflowApprovalGateState.On)]
+    [InlineData(WorkflowDefinitionLookupStatus.Absent, WorkflowApprovalGateState.Off)]
+    [InlineData(WorkflowDefinitionLookupStatus.Unknown, WorkflowApprovalGateState.Unavailable)]
+    public async Task ModuleUnknown_ConfigAbsent_PublishedDefinitionDecides(
+        WorkflowDefinitionLookupStatus definition, WorkflowApprovalGateState expected)
+    {
+        var gate = Gate(ModuleAccess.Unknown, new FakeLookupConfigCache(WorkflowConfigLookup.Absent), Definitions(definition));
+
+        (await gate.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(expected);
+    }
+
     [Fact]
-    public async Task ModuleUnknown_ConfigAbsent_TurnsApprovalOff()
+    public async Task ModuleUnknown_ConfigAbsent_NoDefinitionProviderRegistered_IsOff()
     {
         var gate = Gate(ModuleAccess.Unknown, new FakeLookupConfigCache(WorkflowConfigLookup.Absent));
 
         (await gate.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.Off);
+    }
+
+    [Fact]
+    public async Task ModuleUnknown_NoWorkflowModuleName_LogsError()
+    {
+        var logger = new CapturingLogger<WorkflowModuleApprovalGate>();
+        var gate = new WorkflowModuleApprovalGate(
+            new ScriptedModuleAccessService(ModuleAccess.Unknown), new FakeLookupConfigCache(WorkflowConfigLookup.Absent), logger);
+
+        await gate.GetApprovalStateAsync(TenantId, null, EntityType);
+
+        logger.Entries.Should().Contain(e => e.Level == LogLevel.Error && e.Message.Contains(EntityType));
     }
 
     [Fact]
@@ -99,7 +123,7 @@ public class WorkflowModuleApprovalGateTests
 
     [Theory]
     [InlineData(WorkflowConfigLookupStatus.Found, WorkflowApprovalGateMetrics.ConfigFound)]
-    [InlineData(WorkflowConfigLookupStatus.Absent, WorkflowApprovalGateMetrics.ConfigAbsent)]
+    [InlineData(WorkflowConfigLookupStatus.Absent, WorkflowApprovalGateMetrics.NothingBound)]
     [InlineData(WorkflowConfigLookupStatus.Unknown, WorkflowApprovalGateMetrics.ConfigUnknown)]
     public async Task ModuleUnknown_LogsWarningAndRecordsMetric(WorkflowConfigLookupStatus status, string outcome)
     {
@@ -138,6 +162,41 @@ public class WorkflowModuleApprovalGateTests
     }
 
     [Fact]
+    public async Task RealServices_SnapshotMissing_ConfigExpired_DefinitionPublished_TurnsApprovalOn()
+    {
+        var redis = new InMemoryGlobalRedis();
+        await redis.SetAsync(
+            WorkflowDefinitionCacheKeys.PublishedDefinitionByEntityType(TenantId, EntityType),
+            new PublishedWorkflowDefinition { TenantId = TenantId, WorkflowCode = "WF", EntityType = EntityType });
+
+        (await RealGate(redis).GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.On);
+    }
+
+    [Fact]
+    public async Task RealServices_SnapshotMissing_NothingPublished_IsOff()
+    {
+        (await RealGate(new InMemoryGlobalRedis()).GetApprovalStateAsync(TenantId, Module, EntityType))
+            .Should().Be(WorkflowApprovalGateState.Off);
+    }
+
+    [Fact]
+    public async Task DefinitionProvider_FoundAbsentAndUnknown()
+    {
+        var redis = new InMemoryGlobalRedis();
+        await redis.SetAsync(
+            WorkflowDefinitionCacheKeys.PublishedDefinition(TenantId, "WF", EntityType),
+            new PublishedWorkflowDefinition { TenantId = TenantId, WorkflowCode = "WF", EntityType = EntityType });
+        var provider = new WorkflowDefinitionProvider(SharedCache(redis), NullLogger<WorkflowDefinitionProvider>.Instance);
+
+        (await provider.LookupPublishedDefinitionAsync(TenantId, "WF", EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Found);
+        (await provider.LookupPublishedDefinitionByEntityTypeAsync(TenantId, EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Absent);
+        redis.Down = true;
+        (await provider.LookupPublishedDefinitionAsync(TenantId, "WF", EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Unknown);
+        (await provider.LookupPublishedDefinitionByEntityTypeAsync(TenantId, EntityType)).Status.Should().Be(WorkflowDefinitionLookupStatus.Unknown);
+        (await provider.GetPublishedDefinitionAsync(TenantId, "WF", EntityType)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task RealServices_SnapshotPresentWithoutWorkflow_IsOff()
     {
         var redis = new InMemoryGlobalRedis();
@@ -166,11 +225,65 @@ public class WorkflowModuleApprovalGateTests
     }
 
     [Fact]
-    public async Task ShouldTriggerWorkflow_ModuleUnknown_ConfigAbsent_ReturnsFalse()
+    public async Task ShouldTriggerWorkflow_ModuleUnknown_NothingBound_ReturnsFalse()
     {
-        var service = WorkflowServiceFor(ModuleAccess.Unknown, WorkflowConfigLookup.Absent);
+        var service = WorkflowServiceFor(ModuleAccess.Unknown, WorkflowConfigLookup.Absent, Definitions(WorkflowDefinitionLookupStatus.Absent));
 
         (await service.ShouldTriggerWorkflow(NewEntity(), "CREATE", Module)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Unknown)]
+    [InlineData(ModuleAccess.Enabled)]
+    public async Task ShouldTriggerWorkflow_ConfigMissing_PublishedDefinition_CreateReturnsTrue(ModuleAccess access)
+    {
+        var service = WorkflowServiceFor(access, WorkflowConfigLookup.Absent, Definitions(WorkflowDefinitionLookupStatus.Found));
+
+        (await service.ShouldTriggerWorkflow(NewEntity(), "CREATE", Module)).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("UPDATE", WorkflowDefinitionLookupStatus.Found)]
+    [InlineData("DELETE", WorkflowDefinitionLookupStatus.Found)]
+    [InlineData("CREATE", WorkflowDefinitionLookupStatus.Unknown)]
+    [InlineData("UPDATE", WorkflowDefinitionLookupStatus.Unknown)]
+    public async Task ShouldTriggerWorkflow_ModuleEnabled_ConfigMissing_RefusesWhenDefinitionCannotDecide(
+        string operation, WorkflowDefinitionLookupStatus definition)
+    {
+        var service = WorkflowServiceFor(ModuleAccess.Enabled, WorkflowConfigLookup.Absent, Definitions(definition));
+
+        var act = () => service.ShouldTriggerWorkflow(NewEntity(), operation, Module);
+
+        (await act.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>()).Which.Operation.Should().Be(operation);
+    }
+
+    [Fact]
+    public async Task ShouldTriggerWorkflow_ConditionEvaluationFailure_Propagates()
+    {
+        var service = WorkflowServiceFor(ModuleAccess.Enabled, WorkflowConfigLookup.Found(new EntityWorkflowConfig
+        {
+            EnableWorkflowForCreate = true,
+            CreateWorkflowCode = "WF",
+            CreateTriggerConditions = [new WorkflowTriggerCondition { Field = nameof(ThrowingWorkflowEntity.Broken), Value = "x" }]
+        }));
+        var entity = new ThrowingWorkflowEntity { TenantId = TenantId };
+        entity.EnableWorkflowProcessing();
+
+        var act = () => service.ShouldTriggerWorkflow(entity, "CREATE", Module);
+
+        await act.Should().ThrowAsync<Exception>();
+    }
+
+    [Fact]
+    public async Task ShouldTriggerWorkflow_ModuleEnabled_ConfigUnreadable_RecordsMetric()
+    {
+        var service = WorkflowServiceFor(ModuleAccess.Enabled, WorkflowConfigLookup.Unknown);
+        using var metrics = new GateMetricRecorder();
+
+        var act = () => service.ShouldTriggerWorkflow(NewEntity(), "CREATE", Module);
+
+        await act.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+        metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.ConfigSource, Module, "TestWorkflowEntity", "CREATE"));
     }
 
     [Theory]
@@ -245,8 +358,22 @@ public class WorkflowModuleApprovalGateTests
         (await legacyOn.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.On);
     }
 
-    private static WorkflowModuleApprovalGate Gate(ModuleAccess access, IWorkflowConfigCacheService config) =>
-        new(new ScriptedModuleAccessService(access), config, NullLogger<WorkflowModuleApprovalGate>.Instance);
+    private static WorkflowModuleApprovalGate Gate(
+        ModuleAccess access,
+        IWorkflowConfigCacheService config,
+        IWorkflowDefinitionProvider? definitions = null) =>
+        new(new ScriptedModuleAccessService(access), config, NullLogger<WorkflowModuleApprovalGate>.Instance, definitions);
+
+    private static IWorkflowDefinitionProvider Definitions(WorkflowDefinitionLookupStatus status) =>
+        new FixedDefinitionProvider(status switch
+        {
+            WorkflowDefinitionLookupStatus.Found => WorkflowDefinitionLookup.Found(new PublishedWorkflowDefinition
+            {
+                TenantId = TenantId, WorkflowCode = "WF", EntityType = EntityType, IsActive = true
+            }),
+            WorkflowDefinitionLookupStatus.Absent => WorkflowDefinitionLookup.Absent,
+            _ => WorkflowDefinitionLookup.Unknown
+        });
 
     private static WorkflowModuleApprovalGate RealGate(InMemoryGlobalRedis redis)
     {
@@ -254,7 +381,8 @@ public class WorkflowModuleApprovalGateTests
         return new WorkflowModuleApprovalGate(
             new TenantModuleAccessService(shared, new HttpContextAccessor()),
             new WorkflowConfigCacheService(shared, new TenantContext(), NullLogger<WorkflowConfigCacheService>.Instance),
-            NullLogger<WorkflowModuleApprovalGate>.Instance);
+            NullLogger<WorkflowModuleApprovalGate>.Instance,
+            new WorkflowDefinitionProvider(shared, NullLogger<WorkflowDefinitionProvider>.Instance));
     }
 
     private static WorkflowConfigCacheService ConfigCache(InMemoryGlobalRedis redis) =>
@@ -263,14 +391,42 @@ public class WorkflowModuleApprovalGateTests
     private static SharedRedisCacheService SharedCache(InMemoryGlobalRedis redis) =>
         new(redis, NullLogger<RedisCacheService>.Instance, new ConfigurationBuilder().Build());
 
-    private static WorkflowService WorkflowServiceFor(ModuleAccess access, WorkflowConfigLookup lookup) =>
+    private static WorkflowService WorkflowServiceFor(
+        ModuleAccess access,
+        WorkflowConfigLookup lookup,
+        IWorkflowDefinitionProvider? definitions = null) =>
         new(
             new FakeLookupConfigCache(lookup),
             new ScriptedModuleAccessService(access),
             new TenantContext(),
             Microsoft.Extensions.Options.Options.Create(new SystemOptions()),
             NullLogger<WorkflowService>.Instance,
-            new FakeCurrentUserService(TenantId));
+            new FakeCurrentUserService(TenantId),
+            definitions);
+
+    private sealed class ThrowingWorkflowEntity : TestWorkflowEntity
+    {
+        public string Broken => throw new InvalidOperationException("broken property");
+    }
+
+    private sealed class FixedDefinitionProvider(WorkflowDefinitionLookup lookup) : IWorkflowDefinitionProvider
+    {
+        public Task<PublishedWorkflowDefinition?> GetPublishedDefinitionAsync(
+            string tenantId, string workflowCode, string entityType, CancellationToken cancellationToken = default) =>
+            Task.FromResult(lookup.Definition);
+
+        public Task<PublishedWorkflowDefinition?> GetPublishedDefinitionByEntityTypeAsync(
+            string tenantId, string entityType, CancellationToken cancellationToken = default) =>
+            Task.FromResult(lookup.Definition);
+
+        public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionAsync(
+            string tenantId, string workflowCode, string entityType, CancellationToken cancellationToken = default) =>
+            Task.FromResult(lookup);
+
+        public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionByEntityTypeAsync(
+            string tenantId, string entityType, CancellationToken cancellationToken = default) =>
+            Task.FromResult(lookup);
+    }
 
     private static TestWorkflowEntity NewEntity()
     {
@@ -336,23 +492,30 @@ public class WorkflowModuleApprovalGateTests
     {
         private readonly MeterListener _listener = new();
         private readonly List<(string Outcome, string Module, string EntityType)> _outcomes = [];
+        private readonly List<(string Source, string Module, string EntityType, string Operation)> _unreadable = [];
 
         public GateMetricRecorder()
         {
             _listener.InstrumentPublished = (instrument, listener) =>
             {
-                if (instrument.Meter.Name == WorkflowApprovalGateMetrics.MeterName
-                    && instrument.Name == WorkflowApprovalGateMetrics.ModuleStateUnknownInstrument)
+                if (instrument.Meter.Name == WorkflowApprovalGateMetrics.MeterName)
                     listener.EnableMeasurementEvents(instrument);
             };
-            _listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+            _listener.SetMeasurementEventCallback<long>((instrument, _, tags, _) =>
             {
                 var values = new Dictionary<string, string>();
                 foreach (var tag in tags)
                     values[tag.Key] = tag.Value?.ToString() ?? string.Empty;
 
                 lock (_outcomes)
-                    _outcomes.Add((values.GetValueOrDefault("outcome", ""), values.GetValueOrDefault("module", ""), values.GetValueOrDefault("entity_type", "")));
+                {
+                    if (instrument.Name == WorkflowApprovalGateMetrics.StateUnreadableInstrument)
+                        _unreadable.Add((values.GetValueOrDefault("source", ""), values.GetValueOrDefault("module", ""),
+                            values.GetValueOrDefault("entity_type", ""), values.GetValueOrDefault("operation", "")));
+                    else
+                        _outcomes.Add((values.GetValueOrDefault("outcome", ""), values.GetValueOrDefault("module", ""),
+                            values.GetValueOrDefault("entity_type", "")));
+                }
             });
             _listener.Start();
         }
@@ -363,6 +526,15 @@ public class WorkflowModuleApprovalGateTests
             {
                 lock (_outcomes)
                     return _outcomes.ToList();
+            }
+        }
+
+        public IReadOnlyList<(string Source, string Module, string EntityType, string Operation)> Unreadable
+        {
+            get
+            {
+                lock (_outcomes)
+                    return _unreadable.ToList();
             }
         }
 

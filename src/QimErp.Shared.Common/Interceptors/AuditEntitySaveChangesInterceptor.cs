@@ -1174,6 +1174,7 @@ public class AuditEntitySaveChangesInterceptor(
             // approved entity, flipping it back to InProgress.
             string? workflowCode = operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null;
             var skipWorkflowInitiation = false;
+            var configMissing = false;
 
             if (string.IsNullOrWhiteSpace(workflowCode))
             {
@@ -1186,8 +1187,13 @@ public class AuditEntitySaveChangesInterceptor(
                 {
                     var configLookup = await configCacheService.LookupEntityConfigAsync(module, entity.EntityType, tenantId);
                     if (configLookup.Status == WorkflowConfigLookupStatus.Unknown)
+                    {
+                        WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                            WorkflowApprovalGateMetrics.ConfigSource, module, entity.EntityType, operation);
                         throw new WorkflowApprovalStateUnavailableException(tenantId, module, entity.EntityType, operation);
+                    }
 
+                    configMissing = configLookup.Status == WorkflowConfigLookupStatus.Absent;
                     var config = configLookup.Config;
                     if (config != null)
                     {
@@ -1250,6 +1256,14 @@ public class AuditEntitySaveChangesInterceptor(
             // initiate it for this save.
             if (operation is "UPDATE" or "DELETE" && string.IsNullOrWhiteSpace(workflowCode))
             {
+                if (configMissing
+                    && await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
+                        definitionProvider, logger, tenantId, gateModule, entity.EntityType, operation, cancellationToken)
+                    == WorkflowApprovalGateState.Unavailable)
+                {
+                    throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);
+                }
+
                 skipWorkflowInitiation = true;
             }
 
@@ -1264,16 +1278,20 @@ public class AuditEntitySaveChangesInterceptor(
 
             if (!string.IsNullOrWhiteSpace(tenantId) && definitionProvider != null)
             {
-                if (!string.IsNullOrWhiteSpace(workflowCode))
-                {
-                    publishedDefinition = await definitionProvider.GetPublishedDefinitionAsync(
-                        tenantId, workflowCode, entity.EntityType, cancellationToken);
-                }
-                else
-                {
-                    publishedDefinition = await definitionProvider.GetPublishedDefinitionByEntityTypeAsync(
+                var definitionLookup = !string.IsNullOrWhiteSpace(workflowCode)
+                    ? await definitionProvider.LookupPublishedDefinitionAsync(
+                        tenantId, workflowCode, entity.EntityType, cancellationToken)
+                    : await definitionProvider.LookupPublishedDefinitionByEntityTypeAsync(
                         tenantId, entity.EntityType, cancellationToken);
+
+                if (definitionLookup.Status == WorkflowDefinitionLookupStatus.Unknown)
+                {
+                    WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                        WorkflowApprovalGateMetrics.DefinitionSource, gateModule, entity.EntityType, operation);
+                    throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);
                 }
+
+                publishedDefinition = definitionLookup.Definition;
 
                 if (publishedDefinition != null)
                 {
@@ -1388,9 +1406,16 @@ public class AuditEntitySaveChangesInterceptor(
                     {
                         if (string.IsNullOrWhiteSpace(workflowCode))
                         {
-                            workflowCode = await configCacheService.GetWorkflowCodeAsync(module, entity.EntityType, operation, tenantId);
-                            if (entityWorkflowConfig == null)
-                                entityWorkflowConfig = await configCacheService.GetEntityConfigAsync(module, entity.EntityType, tenantId);
+                            var fallbackLookup = await configCacheService.LookupEntityConfigAsync(module, entity.EntityType, tenantId);
+                            if (fallbackLookup.Status == WorkflowConfigLookupStatus.Unknown)
+                            {
+                                WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                                    WorkflowApprovalGateMetrics.ConfigSource, module, entity.EntityType, operation);
+                                throw new WorkflowApprovalStateUnavailableException(tenantId, module, entity.EntityType, operation);
+                            }
+
+                            workflowCode = operation == "CREATE" ? fallbackLookup.Config?.CreateWorkflowCode : null;
+                            entityWorkflowConfig ??= fallbackLookup.Config;
                         }
 
                         logger.LogInformation("Workflow should be triggered for {EntityType} {Operation}. Initiating workflow without EntityWorkflowStep. WorkflowCode={WorkflowCode}",

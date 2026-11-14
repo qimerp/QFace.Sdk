@@ -622,6 +622,36 @@ internal sealed class FakeWorkflowConfigCacheService : IWorkflowConfigCacheServi
 internal sealed class FakeWorkflowDefinitionProvider(string tenantId) : IWorkflowDefinitionProvider
 {
     private readonly Dictionary<string, PublishedWorkflowDefinition> _definitions = new(StringComparer.OrdinalIgnoreCase);
+    private PublishedWorkflowDefinition? _byEntity;
+
+    public bool Unreadable { get; set; }
+
+    public void SetByEntityDefinition(string workflowCode, PublishedWorkflowDefinition definition)
+    {
+        SetDefinition(workflowCode, definition);
+        _byEntity = definition;
+    }
+
+    public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionAsync(
+        string tenantId,
+        string workflowCode,
+        string entityType,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Unreadable
+            ? WorkflowDefinitionLookup.Unknown
+            : _definitions.TryGetValue(workflowCode, out var definition)
+                ? WorkflowDefinitionLookup.Found(definition)
+                : WorkflowDefinitionLookup.Absent);
+
+    public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionByEntityTypeAsync(
+        string tenantId,
+        string entityType,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Unreadable
+            ? WorkflowDefinitionLookup.Unknown
+            : _byEntity is null
+                ? WorkflowDefinitionLookup.Absent
+                : WorkflowDefinitionLookup.Found(_byEntity));
 
     public void SetDefinition(string workflowCode, PublishedWorkflowDefinition definition)
     {
@@ -637,6 +667,9 @@ internal sealed class FakeWorkflowDefinitionProvider(string tenantId) : IWorkflo
         string entityType,
         CancellationToken cancellationToken = default)
     {
+        if (Unreadable)
+            return Task.FromResult<PublishedWorkflowDefinition?>(null);
+
         _definitions.TryGetValue(workflowCode, out var definition);
         return Task.FromResult(definition);
     }
@@ -645,7 +678,7 @@ internal sealed class FakeWorkflowDefinitionProvider(string tenantId) : IWorkflo
         string tenantId,
         string entityType,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult<PublishedWorkflowDefinition?>(null);
+        Task.FromResult(Unreadable ? null : _byEntity);
 }
 
 internal sealed class RecordingWorkflowTriggerBridge : IWorkflowTriggerBridge
