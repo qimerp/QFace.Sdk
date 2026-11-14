@@ -281,7 +281,7 @@ public class RedisCacheService : IRedisCacheService
         catch (Exception ex)
         {
             readFailed = true;
-            _logger.LogWarning(ex, "Cache read failed; loading from origin");
+            _logger.LogWarning("Cache read failed for key {Key} as {Type} ({ExceptionType}); loading from origin", fullKey, typeof(T).Name, ex.GetType().Name);
         }
 
         using var fill = _fillFence.Enter(fullKey);

@@ -48,7 +48,23 @@ public sealed record ManifestTemplate(
     ManifestSender Sender,
     string HtmlKey,
     string TextKey,
-    IReadOnlyList<ManifestIntentDeclaration> Intents);
+    IReadOnlyList<ManifestIntentDeclaration> Intents)
+{
+    /// <summary>Null means the template is not eligible for tenant branding; always null in a schema version 1 manifest.</summary>
+    public ManifestBranding? Branding { get; init; }
+}
+
+/// <summary><paramref name="Tokens"/> holds the defaults for exactly BrandBand, BrandAccent and BrandLink; the only variant key is <see cref="ManifestBranding.LogoVariant"/>.</summary>
+public sealed record ManifestBranding(
+    IReadOnlyList<string> Audiences,
+    IReadOnlyDictionary<string, string> Tokens,
+    string LogoHost,
+    IReadOnlyDictionary<string, ManifestTemplateVariant> Variants)
+{
+    public const string LogoVariant = "logo";
+}
+
+public sealed record ManifestTemplateVariant(string HtmlKey);
 
 public sealed record ManifestIntentDeclaration(
     string Key,
@@ -70,4 +86,11 @@ public sealed record PinnedTemplate(
     string Html,
     string Text,
     IntentContract Contract,
-    string ContractSha256);
+    string ContractSha256)
+{
+    /// <summary>Null for the standard HTML; otherwise the key under <see cref="ManifestBranding.Variants"/>.</summary>
+    public string? Variant { get; init; }
+
+    /// <summary>SHA-256 of the HTML object loaded into <see cref="Html"/>; set by <see cref="ReleaseManifestReader"/>.</summary>
+    public string VariantHtmlSha256 { get; init; } = string.Empty;
+}

@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text;
 using Amazon.S3.Model;
 using Microsoft.AspNetCore.Http;
@@ -10,7 +11,6 @@ public class FileUploadService : IFileUploadService
 {
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
-    private readonly string _cdnBaseDomain;
     private readonly string _region;
     private readonly ILogger<FileUploadService> _logger;
     private readonly BlobStorageOptions _options;
@@ -30,16 +30,21 @@ public class FileUploadService : IFileUploadService
         // Get region from options
         _region = _options.Region ?? "nyc3";
 
-        // Base domain for CDN without region prefix
-        _cdnBaseDomain = _options.Bucket?.CdnBaseDomain ??
-                         "cdn.digitaloceanspaces.com";
         _logger = logger;
         _imageResizeService = imageResizeService;
 
-        // Log the service URL, bucket and CDN setup for debugging
-        _logger.LogInformation("Initialized S3FileUploadService with service URL: {ServiceUrl}, bucket: {BucketName}, region: {Region}, CDN base domain: {CdnBaseDomain}",
-            _options.ServiceURL, _bucketName, _region, _cdnBaseDomain);
+        _logger.LogInformation("Initialized S3FileUploadService for provider {Provider}, region {Region}", _options.Provider, _region);
     }
+
+    /// <summary>Object keys carry tenant, record and file names, so logs name a key only by this hash.</summary>
+    private static string KeyRef(string s3Key) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(s3Key)))[..12].ToLowerInvariant();
+
+    private static string KeyRefOrNone(string? s3Key) => s3Key is null ? "none" : KeyRef(s3Key);
+
+    /// <summary>S3 and URI messages can carry keys and signed URLs, so a failure leaves this class only as its type and stack trace.</summary>
+    private static Exception TypeOnly(Exception ex) =>
+        ExceptionDispatchInfo.SetRemoteStackTrace(new Exception(ex.GetType().FullName), ex.StackTrace ?? string.Empty);
 
     private bool SupportsCannedAcl()
     {
@@ -60,6 +65,7 @@ public class FileUploadService : IFileUploadService
             throw new ArgumentException("File is empty or null", nameof(file));
         }
 
+        string? s3Key = null;
         try
         {
             // Generate unique file name if not provided
@@ -68,9 +74,9 @@ public class FileUploadService : IFileUploadService
                 $"{fileName}{Path.GetExtension(file.FileName)}";
 
             // Combine folder and filename for the full S3 key
-            var s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
+            s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
 
-            _logger.LogInformation("Attempting to upload file to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Attempting to upload file to S3, key ref {KeyRef}", KeyRef(s3Key));
 
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
@@ -78,7 +84,7 @@ public class FileUploadService : IFileUploadService
 
             await UploadObjectAsync(memoryStream, s3Key, file.ContentType ?? "application/octet-stream", isPublic);
 
-            _logger.LogInformation("Successfully uploaded file to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Successfully uploaded file to S3, key ref {KeyRef}", KeyRef(s3Key));
 
 
             var s3KeyUrl = GetCdnUrl(s3Key);
@@ -94,14 +100,15 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error uploading file to S3. StatusCode: {StatusCode}, Message: {Message}, ErrorCode: {ErrorCode}, ResponseBody: {ResponseBody}",
-                ex.StatusCode, ex.Message, ex.ErrorCode, ex.ResponseBody ?? "(none)");
-            throw new Exception($"Error uploading file to S3: {ex.Message}", ex);
+            _logger.LogError(TypeOnly(ex), "AWS S3 Error uploading file to S3. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}",
+                ex.StatusCode, ex.ErrorCode);
+            throw new Exception("Error uploading file to S3", TypeOnly(ex));
         }
 
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error uploading file to S3: {Message}", ex.Message);
+            _logger.LogError("Unexpected error uploading file to S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -113,10 +120,11 @@ public class FileUploadService : IFileUploadService
             throw new ArgumentException("File URL cannot be null or empty", nameof(fileUrl));
         }
 
+        string? s3Key = null;
         try
         {
             // Extract the S3 key from the CDN URL if needed
-            string s3Key = ExtractS3KeyFromUrl(fileUrl);
+            s3Key = ExtractS3KeyFromUrl(fileUrl);
 
             var deleteObjectRequest = new DeleteObjectRequest
             {
@@ -125,16 +133,18 @@ public class FileUploadService : IFileUploadService
             };
 
             await _s3Client.DeleteObjectAsync(deleteObjectRequest);
-            _logger.LogInformation("Successfully deleted file from S3 with key: {FileKey}", s3Key);
+            _logger.LogInformation("Successfully deleted file from S3, key ref {KeyRef}", KeyRef(s3Key));
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error deleting file from S3: {Message}", ex.Message);
-            throw new Exception($"Error deleting file from S3: {ex.Message}", ex);
+            _logger.LogError("AWS S3 Error deleting file from S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
+            throw new Exception("Error deleting file from S3", TypeOnly(ex));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error deleting file from S3: {Message}", ex.Message);
+            _logger.LogError("Unexpected error deleting file from S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -164,13 +174,15 @@ public class FileUploadService : IFileUploadService
 
     public Task<string> GetPreSignedUrlAsync(string fileKey, int expirationMinutes = 15)
     {
+        string? s3Key = null;
         try
         {
             // Extract the S3 key from the CDN URL if needed
-            string s3Key = ExtractS3KeyFromUrl(fileKey);
+            s3Key = ExtractS3KeyFromUrl(fileKey);
 
-            // Log the original file key
-            _logger.LogInformation("Original file key: {FileKey}", s3Key);
+
+            // R2 rejects SigV2; force V4 immediately before signing (custom ServiceURL endpoints).
+            Amazon.AWSConfigsS3.UseSignatureVersion4 = true;
 
             var request = new GetPreSignedUrlRequest
             {
@@ -182,18 +194,20 @@ public class FileUploadService : IFileUploadService
             };
 
             var url = _s3Client.GetPreSignedURL(request);
-            _logger.LogInformation("Generated pre-signed URL before fix: {Url}", url);
+            _logger.LogInformation("Generated pre-signed URL, key ref {KeyRef}", KeyRef(s3Key));
 
             return Task.FromResult(FixDoubledBucketHost(url));
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error getting pre-signed URL: {Message}", ex.Message);
-            throw new Exception($"Error getting pre-signed URL: {ex.Message}", ex);
+            _logger.LogError("AWS S3 Error getting pre-signed URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
+            throw new Exception("Error getting pre-signed URL", TypeOnly(ex));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error getting pre-signed URL: {Message}", ex.Message);
+            _logger.LogError("Unexpected error getting pre-signed URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -211,9 +225,9 @@ public class FileUploadService : IFileUploadService
         if (contentLength <= 0)
             throw new ArgumentOutOfRangeException(nameof(contentLength), "Content length must be greater than zero");
 
+        var s3Key = key.TrimStart('/');
         try
         {
-            var s3Key = key.TrimStart('/');
             var request = new GetPreSignedUrlRequest
             {
                 BucketName = _bucketName,
@@ -226,7 +240,7 @@ public class FileUploadService : IFileUploadService
             request.Headers.ContentLength = contentLength;
 
             var putUrl = FixDoubledBucketHost(_s3Client.GetPreSignedURL(request));
-            _logger.LogInformation("Generated presigned PUT URL for key: {S3Key}", s3Key);
+            _logger.LogInformation("Generated presigned PUT URL, key ref {KeyRef}", KeyRef(s3Key));
 
             return Task.FromResult(new PresignedPutUrlResult
             {
@@ -237,12 +251,14 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error creating presigned PUT URL: {Message}", ex.Message);
-            throw new Exception($"Error creating presigned PUT URL: {ex.Message}", ex);
+            _logger.LogError("AWS S3 Error creating presigned PUT URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRef(s3Key));
+            throw new Exception("Error creating presigned PUT URL", TypeOnly(ex));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error creating presigned PUT URL: {Message}", ex.Message);
+            _logger.LogError("Unexpected error creating presigned PUT URL ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRef(s3Key));
             throw;
         }
     }
@@ -251,9 +267,8 @@ public class FileUploadService : IFileUploadService
     {
         if (url.Contains($"{_bucketName}.{_bucketName}."))
         {
-            var fixedUrl = url.Replace($"{_bucketName}.{_bucketName}.", $"{_bucketName}.");
-            _logger.LogInformation("Fixed URL with doubled bucket name: {Url}", fixedUrl);
-            return fixedUrl;
+            _logger.LogInformation("Fixed a pre-signed URL with a doubled bucket name");
+            return url.Replace($"{_bucketName}.{_bucketName}.", $"{_bucketName}.");
         }
 
         return url;
@@ -298,8 +313,8 @@ public class FileUploadService : IFileUploadService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error extracting S3 key from URL: {Url}", url);
-            throw new ArgumentException($"Invalid URL format: {url}", nameof(url), ex);
+            _logger.LogError(TypeOnly(ex), "Error extracting S3 key from a URL");
+            throw new ArgumentException("Invalid URL format", nameof(url), TypeOnly(ex));
         }
     }
 
@@ -318,6 +333,7 @@ public class FileUploadService : IFileUploadService
             throw new ArgumentException("Base64 image string is empty or null", nameof(base64Image));
         }
 
+        string? s3Key = null;
         try
         {
             // Remove data URI prefix if present (e.g., "data:image/jpeg;base64,")
@@ -362,9 +378,9 @@ public class FileUploadService : IFileUploadService
                 : $"{fileName}{extension}";
 
             // Combine folder and filename for the full S3 key
-            var s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
+            s3Key = string.IsNullOrEmpty(folder) ? fileName : $"{folder.TrimEnd('/')}/{fileName}";
 
-            _logger.LogInformation("Attempting to upload Base64 image to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Attempting to upload Base64 image to S3, key ref {KeyRef}", KeyRef(s3Key));
 
             // Convert Base64 to byte array
             byte[] imageBytes;
@@ -375,15 +391,15 @@ public class FileUploadService : IFileUploadService
             }
             catch (FormatException ex)
             {
-                _logger.LogError(ex, "Invalid Base64 string format");
-                throw new ArgumentException("Invalid Base64 string format", nameof(base64Image), ex);
+                _logger.LogError(TypeOnly(ex), "Invalid Base64 string format");
+                throw new ArgumentException("Invalid Base64 string format", nameof(base64Image), TypeOnly(ex));
             }
 
             using var memoryStream = new MemoryStream(imageBytes);
 
             await UploadObjectAsync(memoryStream, s3Key, contentType, isPublic);
 
-            _logger.LogInformation("Successfully uploaded Base64 image to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Successfully uploaded Base64 image to S3, key ref {KeyRef}", KeyRef(s3Key));
 
             var s3KeyUrl = GetCdnUrl(s3Key);
             var signedUrl = await GetPreSignedUrlAsync(s3KeyUrl, 60);
@@ -397,13 +413,14 @@ public class FileUploadService : IFileUploadService
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "AWS S3 Error uploading Base64 image to S3. StatusCode: {StatusCode}, Message: {Message}, ErrorCode: {ErrorCode}, ResponseBody: {ResponseBody}",
-                ex.StatusCode, ex.Message, ex.ErrorCode, ex.ResponseBody ?? "(none)");
-            throw new Exception($"Error uploading Base64 image to S3: {ex.Message}", ex);
+            _logger.LogError(TypeOnly(ex), "AWS S3 Error uploading Base64 image to S3. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}",
+                ex.StatusCode, ex.ErrorCode);
+            throw new Exception("Error uploading Base64 image to S3", TypeOnly(ex));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error uploading Base64 image to S3: {Message}", ex.Message);
+            _logger.LogError("Unexpected error uploading Base64 image to S3 ({ExceptionType}), key ref {KeyRef}",
+                ex.GetType().Name, KeyRefOrNone(s3Key));
             throw;
         }
     }
@@ -506,12 +523,12 @@ public class FileUploadService : IFileUploadService
                                            ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
             // AWS returns 404 for NoSuchKey; MinIO may return 400 for non-existent objects
-            _logger.LogDebug("Object not found: {S3Key} (StatusCode: {StatusCode})", s3Key, ex.StatusCode);
+            _logger.LogDebug("Object not found, key ref {KeyRef} (StatusCode: {StatusCode})", KeyRef(s3Key), ex.StatusCode);
             return null;
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "S3 error getting object {S3Key}: {Message}", s3Key, ex.Message);
+            _logger.LogError(TypeOnly(ex), "S3 error getting object, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
             throw;
         }
     }
@@ -532,11 +549,11 @@ public class FileUploadService : IFileUploadService
                 ContentType = contentType
             };
             await _s3Client.PutObjectAsync(request, cancellationToken);
-            _logger.LogInformation("Uploaded content to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Uploaded content to S3, key ref {KeyRef}", KeyRef(s3Key));
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "S3 error uploading content to {S3Key}: {Message}", s3Key, ex.Message);
+            _logger.LogError(TypeOnly(ex), "S3 error uploading content, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
             throw;
         }
     }
@@ -551,7 +568,7 @@ public class FileUploadService : IFileUploadService
 
         try
         {
-            _logger.LogInformation("Attempting to stream-upload to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Attempting to stream-upload to S3, key ref {KeyRef}", KeyRef(s3Key));
 
             using var buffer = new MemoryStream();
             await stream.CopyToAsync(buffer, cancellationToken);
@@ -559,11 +576,11 @@ public class FileUploadService : IFileUploadService
 
             await UploadObjectAsync(buffer, s3Key, contentType, isPublic: false, cancellationToken);
 
-            _logger.LogInformation("Successfully streamed upload to S3 with key: {S3Key}", s3Key);
+            _logger.LogInformation("Successfully streamed upload to S3, key ref {KeyRef}", KeyRef(s3Key));
         }
         catch (AmazonS3Exception ex)
         {
-            _logger.LogError(ex, "S3 error streaming upload to {S3Key}: {Message}", s3Key, ex.Message);
+            _logger.LogError(TypeOnly(ex), "S3 error streaming upload, key ref {KeyRef}. StatusCode: {StatusCode}, ErrorCode: {ErrorCode}", KeyRef(s3Key), ex.StatusCode, ex.ErrorCode);
             throw;
         }
     }
@@ -639,7 +656,7 @@ public class FileUploadService : IFileUploadService
 
         await UploadObjectAsync(memoryStream, s3Key, contentType, isPublic: false, cancellationToken);
 
-        _logger.LogInformation("Uploaded variant to S3 with key: {S3Key}", s3Key);
+        _logger.LogInformation("Uploaded variant to S3, key ref {KeyRef}", KeyRef(s3Key));
 
         // Return a pre-signed URL so the image is accessible even when the bucket
         // has Block Public Access enabled (the common AWS default).

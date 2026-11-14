@@ -15,10 +15,21 @@ public static class LoggerUserContextScopeExtensions
     /// <summary>
     /// Begins a log scope from HTTP/current user context. No-op when there is nothing to add.
     /// </summary>
-    public static IDisposable BeginUserContextScope(this ILogger logger, ICurrentUserService? user)
+    public static IDisposable BeginUserContextScope(this ILogger logger, ICurrentUserService? user) =>
+        logger.BeginUserContextScope(user, null);
+
+    /// <summary>
+    /// Begins a log scope from HTTP/current user context that stops carrying UserId once <paramref name="anonymousRequest"/> is marked.
+    /// </summary>
+    public static IDisposable BeginUserContextScope(
+        this ILogger logger,
+        ICurrentUserService? user,
+        AnonymousRequestContext? anonymousRequest)
     {
-        var items = UserContextScopeProperties.From(user);
-        return items.Count == 0 ? NullScope.Instance : logger.BeginScope(items)!;
+        if (user == null)
+            return NullScope.Instance;
+        var state = new UserContextScopeState(user.GetTenantId(), user.GetUserId(), anonymousRequest);
+        return state.Count == 0 ? NullScope.Instance : logger.BeginScope(state)!;
     }
 
     /// <summary>
@@ -49,9 +60,7 @@ public static class LoggerUserContextScopeExtensions
         if (!string.IsNullOrWhiteSpace(correlationId))
             items.Add(new KeyValuePair<string, object>("CorrelationId", correlationId));
 
-        var tenantKey = currentUser.GetDomainName() ?? currentUser.GetTenantId();
-        if (!string.IsNullOrWhiteSpace(tenantKey))
-            items.Add(new KeyValuePair<string, object>("TenantId", tenantKey));
+        AddTenant(items, currentUser);
 
         var actorId = currentUser.GetUserId();
         items.Add(new KeyValuePair<string, object>("UserId", string.IsNullOrWhiteSpace(actorId) ? "unknown" : actorId));
@@ -59,5 +68,26 @@ public static class LoggerUserContextScopeExtensions
         items.Add(new KeyValuePair<string, object>("RequestType", requestTypeName));
 
         return items.Count == 0 ? NullScope.Instance : logger.BeginScope(items)!;
+    }
+
+    /// <summary>
+    /// MediatR pipeline scope for an anonymous request: <c>TenantId</c> and <c>RequestType</c> only.
+    /// </summary>
+    public static IDisposable BeginAnonymousMediatrScope(
+        this ILogger logger,
+        ICurrentUserService currentUser,
+        string requestTypeName)
+    {
+        var items = new List<KeyValuePair<string, object>>(2);
+        AddTenant(items, currentUser);
+        items.Add(new KeyValuePair<string, object>("RequestType", requestTypeName));
+        return logger.BeginScope(items)!;
+    }
+
+    private static void AddTenant(List<KeyValuePair<string, object>> items, ICurrentUserService currentUser)
+    {
+        var tenantKey = currentUser.GetDomainName() ?? currentUser.GetTenantId();
+        if (!string.IsNullOrWhiteSpace(tenantKey))
+            items.Add(new KeyValuePair<string, object>("TenantId", tenantKey));
     }
 }

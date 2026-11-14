@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using QFace.Sdk.ActorSystems;
 using QimErp.Shared.Common.Activities.TenantActivity;
 using QimErp.Shared.Common.Actors;
+using QimErp.Shared.Common.Logging;
 
 namespace QimErp.Shared.Common.Services.TenantActivity;
 
@@ -11,11 +12,12 @@ public class TenantActivityRecorder(
 {
     public void Record(RecordTenantActivityRequest request)
     {
+        var anonymous = AnonymousRequests.IsAnonymous(httpContextAccessor.HttpContext);
         var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
-            ? Guid.CreateVersion7().ToString("N")
+            ? (anonymous ? Guid.NewGuid() : Guid.CreateVersion7()).ToString("N")
             : request.CorrelationId;
 
-        var requestContext = AuditRequestContext.TryCapture(httpContextAccessor);
+        var requestContext = anonymous ? null : AuditRequestContext.TryCapture(httpContextAccessor);
         var metadataJson = AuditMetadataMerger.Merge(request.MetadataJson, requestContext);
 
         var normalized = request with

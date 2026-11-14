@@ -64,16 +64,18 @@ public static class BlobStorageExtensions
                 logger.LogInformation("Using BasicAWSCredentials with provided access and secret keys");
             }
 
-            // Create S3 client configuration
+            // Create S3 client configuration.
+            // For R2: set ServiceURL + AuthenticationRegion only. Setting RegionEndpoint together with
+            // a custom ServiceURL makes older AWSSDK builds emit SigV2 on GetPreSignedURL (R2 → 401).
             var clientConfig = new AmazonS3Config
             {
-                RegionEndpoint = RegionEndpoint.GetBySystemName(region),
                 ForcePathStyle = forcePathStyle,
                 SignatureVersion = "4",
                 SignatureMethod = SigningAlgorithm.HmacSHA256,
-                // Required for SigV4 presigns against custom S3-compatible hosts (R2).
                 AuthenticationRegion = region
             };
+            if (!isCloudflareR2)
+                clientConfig.RegionEndpoint = RegionEndpoint.GetBySystemName(region);
 
             // Set service URL if provided (for DigitalOcean or other S3-compatible services)
             if (!string.IsNullOrEmpty(serviceUrl))

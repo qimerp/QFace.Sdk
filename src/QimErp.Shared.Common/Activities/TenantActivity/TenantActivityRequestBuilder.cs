@@ -2157,6 +2157,13 @@ public static class TenantActivityRequestBuilder
             "news", newsId, title, currentUser,
             correlationSuffix: $"news-attachment-added:{newsId:N}:{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
 
+    public static RecordTenantActivityRequest ForNewsImageRemoved(
+        string tenantId, Guid newsId, string title, ICurrentUserService currentUser) =>
+        Build(tenantId, TenantActivityModules.Hr, HrNewsActivityTypes.NewsImageRemoved,
+            $"The image was removed from news \"{title}\"",
+            "news", newsId, title, currentUser,
+            correlationSuffix: $"news-image-removed:{newsId:N}:{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
+
     public static RecordTenantActivityRequest ForNewsContributionCreated(
         string tenantId, Guid contributionId, string summary, ICurrentUserService currentUser) =>
         Build(tenantId, TenantActivityModules.Hr, HrNewsActivityTypes.NewsContributionCreated,

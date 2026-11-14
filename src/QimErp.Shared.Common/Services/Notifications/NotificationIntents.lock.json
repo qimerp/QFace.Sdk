@@ -1,7 +1,25 @@
 {
   "contracts": {
     "auth.password_reset.requested@1": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682",
+    "operator.account_manager.assigned@1": "0b422122570cfff73d5b768d15192e2100c1e2d0afdf2463a196c8475c05ca8e",
+    "people.benefit_enrollment.closing@1": "de352e9e627d06a0cbd88e8bad8a0a8cb124ddeba1b43cb7e12f8d10ea464dbc",
+    "people.document.expiring@1": "3d74c8db21074df98b3281aa9196e549b4f156ca8895851065e2e6a7a345c3b2",
+    "people.employee_message.received@1": "9de6077624f40ed57fc3000a22125822e3d0f5fd634ed838acf827b05520e1d5",
+    "people.hr_message.sent@1": "b054ef0cc0de12b1f70cdaa2d4f3008f482992682a2057fa4643c6ca4df3ef9c",
+    "people.leave_plan.nudged@1": "13728bcb96bf35c6017e425bc76678453813a451fb8a915ab9c90f1e32ed7283",
+    "people.news.published@1": "dce7173e636a81850f1ba6a956b12b521a5af57e36ffd0e518866abf297a2c88",
+    "people.onboarding.cancelled@1": "39b057fd74e7058e878ce38888a98c6240fd42dad85c2843ccc8f15dac32445f",
+    "people.onboarding.helper_assigned@1": "24e0d8042daa52de37be7c89f391051c79ca9740c0eaa2dfe68ba41b0b80e853",
+    "people.onboarding.message_sent@1": "f0603aef94aaa1097689f39909f45524d642bf0cbb95fff54bfa81f76e5fab6b",
+    "people.onboarding_task.completed@1": "404417eb5ef038d5a4ed109e15f323449882bf06bce400c24abaaf4012a1bce8",
+    "people.onboarding_task.escalated@1": "a93f107b64c946a1173a82a900ab40dc9932635d361254b4a1387a9a0c283845",
+    "people.onboarding_task.reminder@1": "dc38d186c093d06b9af104464cbefe98393def0cffa881149ca94fa21a141107",
+    "people.retirement.notice_due@1": "1ec696739f53fb4cd191e0cb2ab3253e2782882e55fa570b7ea7e6da64cad6e4",
+    "people.work_anniversary.today@1": "bde69a4962cb887600fdfeee9d02c54e125b971fd8a0960fb9b7eda7e5fcb680",
+    "people.work_anniversary.upcoming@1": "228b2d57dd135b0e54b072b8946769ee5d7a4cf77ee41882a0427f3867c5c616",
+    "tenant.reply_address.verification_requested@1": "4a0c79fed2c6da455aaa7169313649c6237ae6d88fe1be6af719475b1af92220",
+    "workflow.approval.reminder@1": "6565181f1420b8f56e1364cf1f0f90ee2bbf724f70e1a2f6f647ea973a8bc3ef",
     "workflow.approval.requested@1": "3be98cb078110858d66aff7b2e0272043f022f5fb0153143bbb416e1d785e4fb"
   },
-  "revision": "374b00274fb61159e8e2af7183b3b60e19aac0006d2d9d4c6040d352eee7886d"
+  "revision": "17c1ea07cb493716cf62e8617780eee016a9470638db30171b5f7b1a4f512734"
 }
