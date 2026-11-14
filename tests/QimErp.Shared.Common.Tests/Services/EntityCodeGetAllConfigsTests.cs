@@ -31,6 +31,7 @@ namespace QimErp.Shared.Common.Tests.Services;
 public sealed class EntityCodeGetAllConfigsTests : IDisposable
 {
     private const string Tenant = "019e31ec-entcode-all-000000000001";
+    private const string OtherTenant = "019e31ec-entcode-all-000000000002";
     private const string CompanyA = "company-a";
     private const string CompanyB = "company-b";
     private const string Module = "Leave";
@@ -326,6 +327,59 @@ public sealed class EntityCodeGetAllConfigsTests : IDisposable
         request.CompanyId.Should().Be(CompanyA);
         request.Prefix.Should().Be("LR");
         request.LastSequence.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "Another tenant's tenant-wide row is never returned or used as a company's seed")]
+    public async Task OtherTenantTenantWideRow_IsNotUsedAsSeed()
+    {
+        using var harness = new Harness();
+
+        var otherTenantWide = EntityCodeConfig.Create(OtherTenant, "LeaveRequest", "OTH");
+        otherTenantWide.IncrementSequenceBy(500);
+        await harness.InsertDirectAsync(otherTenantWide);
+
+        SetScope(CompanyScope.ForCompanies([CompanyA, CompanyB], CompanyA));
+        var configs = await harness.Service.GetAllConfigsAsync(Tenant);
+
+        configs.Should().OnlyContain(c => c.TenantId == Tenant && c.CompanyId == CompanyA);
+        var request = configs.Single(c => c.EntityType == "LeaveRequest");
+        request.Id.Should().NotBe(otherTenantWide.Id);
+        request.Prefix.Should().Be("LR");
+        request.LastSequence.Should().Be(0);
+
+        (await harness.Service.GenerateAsync(Tenant, "LeaveRequest")).Should().EndWith("-00001");
+
+        var otherTenantRows = (await harness.StoredConfigsAsync()).Where(c => c.TenantId == OtherTenant).ToList();
+        otherTenantRows.Should().ContainSingle().Which.LastSequence.Should().Be(500);
+    }
+
+    [Fact(DisplayName = "Another tenant's row for the same company id is never returned in place of this tenant's config")]
+    public async Task OtherTenantCompanyRow_IsNotReturned()
+    {
+        using var harness = new Harness();
+
+        var ownTenantWide = EntityCodeConfig.Create(Tenant, "LeaveRequest", "LR");
+        ownTenantWide.IncrementSequenceBy(7);
+        await harness.InsertDirectAsync(ownTenantWide);
+
+        var otherTenantCompany = EntityCodeConfig.Create(OtherTenant, "LeaveRequest", "OTH");
+        otherTenantCompany.WithCompanyId(CompanyA);
+        otherTenantCompany.IncrementSequenceBy(500);
+        await harness.InsertDirectAsync(otherTenantCompany);
+
+        SetScope(CompanyScope.ForCompanies([CompanyA, CompanyB], CompanyA));
+        var configs = await harness.Service.GetAllConfigsAsync(Tenant);
+
+        configs.Should().OnlyContain(c => c.TenantId == Tenant && c.CompanyId == CompanyA);
+        var request = configs.Single(c => c.EntityType == "LeaveRequest");
+        request.Id.Should().NotBe(otherTenantCompany.Id);
+        request.Prefix.Should().Be("LR");
+        request.LastSequence.Should().Be(7);
+
+        (await harness.Service.GenerateAsync(Tenant, "LeaveRequest")).Should().EndWith("-00008");
+
+        var otherTenantRows = (await harness.StoredConfigsAsync()).Where(c => c.TenantId == OtherTenant).ToList();
+        otherTenantRows.Should().ContainSingle().Which.LastSequence.Should().Be(500);
     }
 
     [Fact(DisplayName = "A two-company caller with no active company cannot auto-create tenant-shared configs from the list")]
