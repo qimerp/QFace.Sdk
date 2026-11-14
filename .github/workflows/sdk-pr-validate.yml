@@ -87,3 +87,6 @@ jobs:
             dotnet build "$project" -c Release --no-restore -m:1 -nodeReuse:false -p:UseSharedCompilation=false
             dotnet test "$project" -c Release --no-build
           done
+
+      - name: Testing package guard ships and fires
+        run: bash scripts/check-testing-package-guard.sh

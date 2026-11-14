@@ -29,6 +29,7 @@ public class WorkflowCacheTestSupportTests
 
         (await configCache.GetTenantWarmStatusAsync("HR", "Leave", TenantId)).Should().Be(WorkflowCacheWarmStatus.Warm);
         (await configCache.GetTenantWarmStatusAsync("HR", "Employee", TenantId)).Should().Be(WorkflowCacheWarmStatus.BoundAtWarm);
+        (await configCache.GetTenantWarmStatusAsync("Leave", "Employee", TenantId)).Should().Be(WorkflowCacheWarmStatus.BoundAtWarm);
         (await configCache.GetTenantWarmStatusAsync("HR", "Leave", OtherTenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
     }
 
@@ -41,6 +42,7 @@ public class WorkflowCacheTestSupportTests
 
         (await decorator.GetTenantWarmStatusAsync("HR", "Leave", TenantId)).Should().Be(WorkflowCacheWarmStatus.Warm);
         (await decorator.GetTenantWarmStatusAsync("HR", "Employee", TenantId)).Should().Be(WorkflowCacheWarmStatus.BoundAtWarm);
+        (await decorator.GetTenantWarmStatusAsync("Leave", "employee", TenantId)).Should().Be(WorkflowCacheWarmStatus.BoundAtWarm);
         (await decorator.GetTenantWarmStatusAsync("HR", "Leave", OtherTenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
         (await decorator.LookupEntityConfigAsync("HR", "Employee", TenantId)).Config.Should().BeSameAs(config);
     }

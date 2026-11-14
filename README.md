@@ -80,7 +80,10 @@ For detailed documentation, visit:
 needed. A missing workflow configuration or definition key proves "nothing bound" only when the
 tenant warm marker (`qface:qimerp:workflow:warm:{tenantId}`) is a version 2 marker
 (`{ "warmedAt": ..., "version": 2, "bound": ["{module}:{entityType}", ...] }`), younger than
-`Workflow:WarmMarkerMaxAge` (default 48h), and the entity's pair is not in `bound`.
+`Workflow:WarmMarkerMaxAge` (an `hh:mm:ss` duration, at most and by default 48h), not dated more
+than 5 minutes in the future, and no `bound` entry names the entity type. Entries are matched on
+the part after the colon only, because Platform's module part can be a template category (for
+example `Leave`) that differs from the service's `Workflow:Module` (`HR`).
 
 Platform must ship these, in this order, before any service bumps the package:
 
@@ -89,6 +92,8 @@ Platform must ship these, in this order, before any service bumps the package:
 3. After every successful full warm, write the version 2 warm marker with a 48h TTL.
 4. Rewrite the configuration whenever a definition is published.
 5. When a binding is deleted, write a disabled configuration instead of removing the key.
+6. Rewrite the marker, with the full `bound` set, after every configuration or definition write,
+   including when a binding is created or enabled, not only on the daily warm.
 
 Until the version 2 marker is written, saves of workflow-enabled entities with nothing bound
 return 503.
@@ -97,7 +102,14 @@ return 503.
 
 There is no runtime switch to turn the marker rule off. Test projects use the
 `QimErp.Shared.Common.Testing` package, which fails the build (`QIMTEST001`) in any project
-without `<IsTestProject>true</IsTestProject>`:
+without `<IsTestProject>true</IsTestProject>`. The guard slows accidental misuse; it is not a
+security control, since a project can set the property or call the same cache APIs itself.
+`scripts/check-testing-package-guard.sh` (run by PR validation) packs the package and proves the
+guard ships and fires.
+
+The Testing package always ships with Shared.Common's version and depends on exactly that version.
+Both read `QimErpSharedCommonVersion` from `src/QimErp.Shared.Common/SharedCommonVersion.props`;
+bump it there for a release.
 
 - Suites with an in-memory shared cache: seed a version 2 marker.
 

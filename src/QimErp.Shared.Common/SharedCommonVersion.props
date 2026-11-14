@@ -1,0 +1,6 @@
+<Project>
+    <!-- Bump here for a Shared.Common release; QimErp.Shared.Common.Testing ships the same version and pins it exactly. -->
+    <PropertyGroup>
+        <QimErpSharedCommonVersion>3.11.53-people.8</QimErpSharedCommonVersion>
+    </PropertyGroup>
+</Project>

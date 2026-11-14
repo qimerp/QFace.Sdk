@@ -1,0 +1,8 @@
+<Project>
+    <Target Name="QimErpSharedCommonTestingGuard"
+            BeforeTargets="ResolveAssemblyReferences;CoreCompile"
+            Condition="'$(IsTestProject)' != 'true'">
+        <Error Code="QIMTEST001"
+               Text="QimErp.Shared.Common.Testing is test-only: it makes approval gating treat chosen tenants as having nothing bound. Reference it only from a project with &lt;IsTestProject&gt;true&lt;/IsTestProject&gt;." />
+    </Target>
+</Project>

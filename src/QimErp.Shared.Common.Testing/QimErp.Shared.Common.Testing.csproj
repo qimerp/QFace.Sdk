@@ -1,12 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <Import Project="../QimErp.Shared.Common/SharedCommonVersion.props" />
+
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
 
         <PackageId>QimErp.Shared.Common.Testing</PackageId>
-        <Version>1.0.0</Version>
+        <Version>$(QimErpSharedCommonVersion)</Version>
         <Authors>IAmQwame</Authors>
         <Company>QimErp</Company>
         <Description>
@@ -30,7 +32,17 @@
 
     <ItemGroup>
         <None Update="README.md" Pack="true" PackagePath="/" />
-        <None Update="build/QimErp.Shared.Common.Testing.targets" Pack="true" PackagePath="build/;buildTransitive/" />
+        <None Remove="build/QimErp.Shared.Common.Testing.targets" />
+        <None Include="build/QimErp.Shared.Common.Testing.targets" Pack="true" PackagePath="build/QimErp.Shared.Common.Testing.targets;buildTransitive/QimErp.Shared.Common.Testing.targets" />
     </ItemGroup>
+
+    <!-- The helpers depend on Shared.Common types added in the same release, so the dependency is pinned exactly. -->
+    <Target Name="PinSharedCommonDependency" AfterTargets="_GetProjectReferenceVersions">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Condition="'%(Filename)' == 'QimErp.Shared.Common'">
+                <ProjectVersion>[%(ProjectVersion)]</ProjectVersion>
+            </_ProjectReferencesWithVersions>
+        </ItemGroup>
+    </Target>
 
 </Project>

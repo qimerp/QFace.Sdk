@@ -56,7 +56,8 @@ public sealed class WarmTenantsWorkflowConfigCache(
         if (tenantId is null || !_warmTenantIds.Contains(tenantId))
             return inner.GetTenantWarmStatusAsync(module, entityType, tenantId);
 
-        return Task.FromResult(_boundPairs.Contains(WorkflowTenantWarmMarker.BoundPair(module, entityType))
+        var marker = new WorkflowTenantWarmMarker { Version = WorkflowTenantWarmMarker.CurrentVersion, Bound = [.. _boundPairs] };
+        return Task.FromResult(marker.IsBound(module, entityType)
             ? WorkflowCacheWarmStatus.BoundAtWarm
             : WorkflowCacheWarmStatus.Warm);
     }
