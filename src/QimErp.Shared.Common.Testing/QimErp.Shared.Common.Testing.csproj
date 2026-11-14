@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <PackageId>QimErp.Shared.Common.Testing</PackageId>
+        <Version>1.0.0</Version>
+        <Authors>IAmQwame</Authors>
+        <Company>QimErp</Company>
+        <Description>
+            Test-only helpers for QimErp.Shared.Common approval gating: seed the tenant workflow warm marker
+            or make chosen tenants report a warm workflow cache. Building a project that references this
+            package without IsTestProject=true fails (QIMTEST001).
+        </Description>
+        <PackageTags>qimerp;testing;workflow</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/iamqwame/QimErp</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/iamqwame/QimErp</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>1591;1573;1574</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../QimErp.Shared.Common/QimErp.Shared.Common.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="README.md" Pack="true" PackagePath="/" />
+        <None Update="build/QimErp.Shared.Common.Testing.targets" Pack="true" PackagePath="build/;buildTransitive/" />
+    </ItemGroup>
+
+</Project>

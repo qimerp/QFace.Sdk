@@ -73,19 +73,36 @@ For detailed documentation, visit:
 - [Installation Guide](docs/shared/installation.md)
 - [Configuration Patterns](docs/shared/configuration.md)
 
+## Workflow approval gating: rollout prerequisite (Platform first)
+
+`QimErp.Shared.Common` refuses a save of a workflow-enabled entity with
+`WorkflowApprovalStateUnavailableException` (HTTP 503) unless it can prove whether approval is
+needed. A missing workflow configuration or definition key proves "nothing bound" only when the
+tenant warm marker (`qface:qimerp:workflow:warm:{tenantId}`) is a version 2 marker
+(`{ "warmedAt": ..., "version": 2, "bound": ["{module}:{entityType}", ...] }`), younger than
+`Workflow:WarmMarkerMaxAge` (default 48h), and the entity's pair is not in `bound`.
+
+Platform must ship these, in this order, before any service bumps the package:
+
+1. Write workflow configuration and definition keys without a TTL.
+2. Re-warm them daily.
+3. After every successful full warm, write the version 2 warm marker with a 48h TTL.
+4. Rewrite the configuration whenever a definition is published.
+5. When a binding is deleted, write a disabled configuration instead of removing the key.
+
+Until the version 2 marker is written, saves of workflow-enabled entities with nothing bound
+return 503.
+
 ## Consumers: test suites
 
-Approval gating in `QimErp.Shared.Common` refuses a save of a workflow-enabled entity with
-`WorkflowApprovalStateUnavailableException` (HTTP 503) when no workflow configuration or
-active definition is bound and the tenant warm marker
-(`qface:qimerp:workflow:warm:{tenantId}`, written by Platform) is missing. There is no
-runtime switch to turn this off. Test suites that save such entities without seeding
-workflow configuration use `QimErp.Shared.Common.Testing.WorkflowCacheTestSupport`:
+There is no runtime switch to turn the marker rule off. Test projects use the
+`QimErp.Shared.Common.Testing` package, which fails the build (`QIMTEST001`) in any project
+without `<IsTestProject>true</IsTestProject>`:
 
-- Suites with an in-memory cache: seed the marker through the shared cache the SDK reads.
+- Suites with an in-memory shared cache: seed a version 2 marker.
 
   ```csharp
-  await WorkflowCacheTestSupport.SeedTenantWarmMarkerAsync(sharedCache, tenantId);
+  await WorkflowCacheTestSupport.SeedTenantWarmMarkerAsync(sharedCache, tenantId, boundPairs: []);
   ```
 
 - Suites with a no-op cache or `RedisCache:Enabled=false` (writes are dropped): wrap the
