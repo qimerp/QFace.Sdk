@@ -73,6 +73,31 @@ For detailed documentation, visit:
 - [Installation Guide](docs/shared/installation.md)
 - [Configuration Patterns](docs/shared/configuration.md)
 
+## Consumers: test suites
+
+Approval gating in `QimErp.Shared.Common` refuses a save of a workflow-enabled entity with
+`WorkflowApprovalStateUnavailableException` (HTTP 503) when no workflow configuration or
+active definition is bound and the tenant warm marker
+(`qface:qimerp:workflow:warm:{tenantId}`, written by Platform) is missing. There is no
+runtime switch to turn this off. Test suites that save such entities without seeding
+workflow configuration use `QimErp.Shared.Common.Testing.WorkflowCacheTestSupport`:
+
+- Suites with an in-memory cache: seed the marker through the shared cache the SDK reads.
+
+  ```csharp
+  await WorkflowCacheTestSupport.SeedTenantWarmMarkerAsync(sharedCache, tenantId);
+  ```
+
+- Suites with a no-op cache or `RedisCache:Enabled=false` (writes are dropped): wrap the
+  registered `IWorkflowConfigCacheService` so the test tenants report a warm cache.
+
+  ```csharp
+  services.AddWarmWorkflowTenants(tenantId);
+  ```
+
+  `WarmTenantsWorkflowConfigCache` is the decorator behind it, for suites that build the
+  config cache by hand.
+
 ## Samples
 
 Check out the [samples](samples) directory for complete working examples of each SDK.
