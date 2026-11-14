@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using QimErp.Shared.Common.Services.Cache;
 
 namespace QimErp.Shared.Common.Services.Workflow;
@@ -7,8 +8,14 @@ namespace QimErp.Shared.Common.Services.Workflow;
 /// </summary>
 public class WorkflowDefinitionProvider(
     ISharedDistributedCacheService cache,
-    ILogger<WorkflowDefinitionProvider> logger) : IWorkflowDefinitionProvider
+    ILogger<WorkflowDefinitionProvider> logger,
+    TimeProvider? timeProvider = null) : IWorkflowDefinitionProvider
 {
+    public static readonly TimeSpan AbsentResultLifetime = TimeSpan.FromSeconds(5);
+
+    private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
+    private readonly ConcurrentDictionary<string, (WorkflowDefinitionLookup Lookup, DateTimeOffset ReadAt)> _scopeCache = new();
+
     public async Task<PublishedWorkflowDefinition?> GetPublishedDefinitionAsync(
         string tenantId,
         string workflowCode,
@@ -61,6 +68,13 @@ public class WorkflowDefinitionProvider(
 
     private async Task<WorkflowDefinitionLookup> ReadAsync(string cacheKey, string tenantId, string target)
     {
+        if (_scopeCache.TryGetValue(cacheKey, out var cached)
+            && (cached.Lookup.Status == WorkflowDefinitionLookupStatus.Found
+                || _clock.GetUtcNow() - cached.ReadAt <= AbsentResultLifetime))
+        {
+            return cached.Lookup;
+        }
+
         try
         {
             var read = await cache.ReadEntryAsync<PublishedWorkflowDefinition>(cacheKey);
@@ -68,10 +82,10 @@ public class WorkflowDefinitionProvider(
             {
                 case CacheReadStatus.Hit when read.Value is not null:
                     logger.LogDebug("Cache hit for workflow definition tenant={TenantId}, {Target}", tenantId, target);
-                    return WorkflowDefinitionLookup.Found(read.Value);
+                    return Remember(cacheKey, WorkflowDefinitionLookup.Found(read.Value));
                 case CacheReadStatus.Miss:
                     logger.LogDebug("No published workflow definition in cache for tenant={TenantId}, {Target}", tenantId, target);
-                    return WorkflowDefinitionLookup.Absent;
+                    return Remember(cacheKey, WorkflowDefinitionLookup.Absent);
                 default:
                     logger.LogWarning(
                         "Workflow definition could not be read from cache for tenant={TenantId}, {Target}", tenantId, target);
@@ -83,5 +97,11 @@ public class WorkflowDefinitionProvider(
             logger.LogError(ex, "Error reading workflow definition from cache for tenant={TenantId}, {Target}", tenantId, target);
             return WorkflowDefinitionLookup.Unknown;
         }
+    }
+
+    private WorkflowDefinitionLookup Remember(string cacheKey, WorkflowDefinitionLookup lookup)
+    {
+        _scopeCache[cacheKey] = (lookup, _clock.GetUtcNow());
+        return lookup;
     }
 }

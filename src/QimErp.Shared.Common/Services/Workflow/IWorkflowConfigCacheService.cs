@@ -36,7 +36,7 @@ public interface IWorkflowConfigCacheService
     /// Without the marker a missing configuration key is not proof that nothing is bound. The default
     /// implementation reports <see cref="WorkflowCacheWarmStatus.Unknown"/>, which refuses such writes; override it.
     /// </remarks>
-    Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string? tenantId = null) =>
+    Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string module, string entityType, string? tenantId = null) =>
         Task.FromResult(WorkflowCacheWarmStatus.Unknown);
 }
 

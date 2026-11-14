@@ -1157,6 +1157,7 @@ public class AuditEntitySaveChangesInterceptor(
                     tenantId,
                     gateModule,
                     entity.EntityType,
+                    operation,
                     operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null,
                     cancellationToken);
 
@@ -1266,8 +1267,8 @@ public class AuditEntitySaveChangesInterceptor(
             if (operation is "UPDATE" or "DELETE" && string.IsNullOrWhiteSpace(workflowCode))
             {
                 if (configMissing
-                    && await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
-                        configCacheService, definitionProvider, logger, tenantId, gateModule, entity.EntityType, operation, null, cancellationToken)
+                    && (await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
+                        configCacheService, definitionProvider, logger, tenantId, gateModule, entity.EntityType, operation, null, cancellationToken)).State
                     == WorkflowApprovalGateState.Unavailable)
                 {
                     throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);

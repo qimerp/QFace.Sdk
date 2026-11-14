@@ -15,11 +15,14 @@ public static class WorkflowApprovalGateMetrics
     public const string DefinitionUnknown = "definition_unknown";
     public const string NothingBound = "nothing_bound";
     public const string MarkerMissing = "marker_missing";
+    public const string BoundKeyMissing = "bound_key_missing";
+    public const string PresetCodeUnpublished = "preset_code_unpublished";
     public const string ModuleUnresolved = "module_unresolved";
 
     public const string ConfigSource = "config";
     public const string DefinitionSource = "definition";
     public const string ConfigMissingSource = "config_missing";
+    public const string TenantMissingSource = "tenant_missing";
 
     private static readonly Meter Meter = new(MeterName);
     private static readonly Counter<long> ModuleStateUnknown =

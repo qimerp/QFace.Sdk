@@ -566,7 +566,7 @@ internal sealed class FakeWorkflowConfigCacheService : IWorkflowConfigCacheServi
 
     public WorkflowCacheWarmStatus WarmStatus { get; set; } = WorkflowCacheWarmStatus.Warm;
 
-    public Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string? tenantId = null) =>
+    public Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string module, string entityType, string? tenantId = null) =>
         Task.FromResult(WarmStatus);
 
     public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null)

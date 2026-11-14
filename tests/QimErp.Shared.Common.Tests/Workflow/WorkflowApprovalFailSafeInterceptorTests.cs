@@ -165,7 +165,7 @@ public class WorkflowApprovalFailSafeInterceptorTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task CreateWithPresetCodeUnpublished_EntityTypeDefinitionActive_DoesNotStartIt(bool gate)
+    public async Task CreateWithPresetCodeUnpublished_EntityTypeDefinitionActive_RefusesSave(bool gate)
     {
         await using var harness = Harness(ModuleAccess.Enabled, gate);
         harness.DefinitionProvider.SetByEntityDefinition("Y-WF", ActiveDefinition());
@@ -173,24 +173,52 @@ public class WorkflowApprovalFailSafeInterceptorTests
         var entity = NewEntity();
         entity.WorkflowCode = "X-WF";
         harness.Context.Add(entity);
-        await harness.Context.SaveChangesAsync();
+        var save = () => harness.Context.SaveChangesAsync();
 
-        entity.WorkflowStatus.Should().NotBe(WorkflowStatus.InProgress);
-        entity.DataStatus.Should().Be(DataState.Active);
+        await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+        (await harness.Context.Entities.CountAsync()).Should().Be(0);
         (await ApprovalRowCountAsync(harness)).Should().Be(0);
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task CreateWithPresetCodeUnpublished_MarkerMissing_RefusesSave(bool gate)
+    [InlineData(true, WorkflowCacheWarmStatus.Warm, false)]
+    [InlineData(false, WorkflowCacheWarmStatus.Warm, false)]
+    [InlineData(true, WorkflowCacheWarmStatus.NotWarm, true)]
+    [InlineData(false, WorkflowCacheWarmStatus.NotWarm, true)]
+    [InlineData(true, WorkflowCacheWarmStatus.BoundAtWarm, true)]
+    [InlineData(false, WorkflowCacheWarmStatus.BoundAtWarm, true)]
+    public async Task CreateWithPresetCodeUnpublished_NothingElseBound_MarkerDecides(bool gate, WorkflowCacheWarmStatus warm, bool refused)
     {
         await using var harness = Harness(ModuleAccess.Enabled, gate);
-        harness.DefinitionProvider.SetByEntityDefinition("Y-WF", ActiveDefinition());
-        harness.ConfigCache.WarmStatus = WorkflowCacheWarmStatus.NotWarm;
+        harness.ConfigCache.WarmStatus = warm;
 
         var entity = NewEntity();
         entity.WorkflowCode = "X-WF";
+        harness.Context.Add(entity);
+        var save = () => harness.Context.SaveChangesAsync();
+
+        if (refused)
+        {
+            await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+            (await harness.Context.Entities.CountAsync()).Should().Be(0);
+        }
+        else
+        {
+            await save();
+            entity.DataStatus.Should().Be(DataState.Active);
+            (await ApprovalRowCountAsync(harness)).Should().Be(0);
+        }
+    }
+
+    [Fact]
+    public async Task GlobalEntityWithoutTenant_WorkflowEnabledSave_Refused()
+    {
+        await using var harness = new InterceptorE2EHarness(
+            string.Empty, ModuleName, new ScriptedModuleAccessService(ModuleAccess.Enabled), registerApprovalGate: true);
+
+        var entity = NewEntity();
+        entity.TenantId = string.Empty;
+        entity.EnableGlobal();
         harness.Context.Add(entity);
         var save = () => harness.Context.SaveChangesAsync();
 

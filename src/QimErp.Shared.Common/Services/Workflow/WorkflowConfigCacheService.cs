@@ -14,17 +14,35 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
     private readonly ISharedDistributedCacheService _cache;
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<WorkflowConfigCacheService> _logger;
-    private readonly ConcurrentDictionary<string, EntityWorkflowConfig?> _localCache = new();
-    private readonly ConcurrentDictionary<string, bool> _warmTenants = new();
+    private readonly ConcurrentDictionary<string, EntityWorkflowConfig> _localCache = new();
+    private readonly ConcurrentDictionary<string, WorkflowTenantWarmMarker> _warmMarkers = new();
+    private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _warmMarkerMaxAge;
 
     public WorkflowConfigCacheService(
         ISharedDistributedCacheService cache,
         ITenantContext tenantContext,
         ILogger<WorkflowConfigCacheService> logger)
+        : this(cache, tenantContext, logger, null, null)
+    {
+    }
+
+    public WorkflowConfigCacheService(
+        ISharedDistributedCacheService cache,
+        ITenantContext tenantContext,
+        ILogger<WorkflowConfigCacheService> logger,
+        IConfiguration? configuration,
+        TimeProvider? timeProvider = null)
     {
         _cache = cache;
         _tenantContext = tenantContext;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _warmMarkerMaxAge = TimeSpan.TryParse(
+            configuration?[WorkflowTenantWarmMarker.MaxAgeSettingKey], CultureInfo.InvariantCulture, out var configured)
+            && configured > TimeSpan.Zero
+                ? configured
+                : WorkflowTenantWarmMarker.DefaultMaxAge;
     }
 
     public async Task<EntityWorkflowConfig?> GetEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
@@ -33,36 +51,59 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
     public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
         LookupEntityConfigInternalAsync(ResolveTenantId(tenantId), module, entityType);
 
-    public async Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string? tenantId = null)
+    public async Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string module, string entityType, string? tenantId = null)
     {
         var resolvedTenantId = ResolveTenantId(tenantId);
         if (string.IsNullOrWhiteSpace(resolvedTenantId))
             return WorkflowCacheWarmStatus.NotWarm;
 
         var cacheKey = WorkflowDefinitionCacheKeys.TenantWarmMarker(resolvedTenantId);
-        if (_warmTenants.ContainsKey(cacheKey))
-            return WorkflowCacheWarmStatus.Warm;
-
-        try
+        if (!_warmMarkers.TryGetValue(cacheKey, out var marker))
         {
-            var read = await _cache.ReadEntryAsync<WorkflowTenantWarmMarker>(cacheKey);
-            switch (read.Status)
+            try
             {
-                case CacheReadStatus.Hit when read.Value is not null:
-                    _warmTenants[cacheKey] = true;
-                    return WorkflowCacheWarmStatus.Warm;
-                case CacheReadStatus.Miss:
-                    return WorkflowCacheWarmStatus.NotWarm;
-                default:
-                    _logger.LogWarning("Workflow warm marker could not be read for tenant={TenantId}", resolvedTenantId);
-                    return WorkflowCacheWarmStatus.Unknown;
+                var read = await _cache.ReadEntryAsync<WorkflowTenantWarmMarker>(cacheKey);
+                switch (read.Status)
+                {
+                    case CacheReadStatus.Hit when read.Value is not null:
+                        marker = read.Value;
+                        break;
+                    case CacheReadStatus.Miss:
+                        return WorkflowCacheWarmStatus.NotWarm;
+                    default:
+                        _logger.LogWarning("Workflow warm marker could not be read for tenant={TenantId}", resolvedTenantId);
+                        return WorkflowCacheWarmStatus.Unknown;
+                }
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading workflow warm marker for tenant={TenantId}", resolvedTenantId);
+                return WorkflowCacheWarmStatus.Unknown;
+            }
+
+            if (!marker.IsBoundSetPresent)
+            {
+                _logger.LogWarning(
+                    "Workflow warm marker for tenant={TenantId} is version {Version} without a Bound set; treating the cache as not warm",
+                    resolvedTenantId, marker.Version);
+                return WorkflowCacheWarmStatus.NotWarm;
+            }
+
+            _warmMarkers[cacheKey] = marker;
         }
-        catch (Exception ex)
+
+        var age = _timeProvider.GetUtcNow() - marker.WarmedAt;
+        if (age > _warmMarkerMaxAge)
         {
-            _logger.LogError(ex, "Error reading workflow warm marker for tenant={TenantId}", resolvedTenantId);
-            return WorkflowCacheWarmStatus.Unknown;
+            _logger.LogWarning(
+                "Workflow warm marker for tenant={TenantId} was written {Age} ago, beyond {MaxAge}; treating the cache as not warm",
+                resolvedTenantId, age, _warmMarkerMaxAge);
+            return WorkflowCacheWarmStatus.NotWarm;
         }
+
+        return marker.IsBound(module, entityType)
+            ? WorkflowCacheWarmStatus.BoundAtWarm
+            : WorkflowCacheWarmStatus.Warm;
     }
 
     public async Task<bool> IsWorkflowEnabledAsync(string module, string entityType, string operation, string? tenantId = null)
@@ -122,7 +163,7 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
         if (_localCache.TryGetValue(cacheKey, out var cached))
         {
             _logger.LogDebug("L1 hit for workflow config key: {Key}", cacheKey);
-            return cached is null ? WorkflowConfigLookup.Absent : WorkflowConfigLookup.Found(cached);
+            return WorkflowConfigLookup.Found(cached);
         }
 
         try
@@ -134,7 +175,6 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
                     _localCache[cacheKey] = read.Value;
                     return WorkflowConfigLookup.Found(read.Value);
                 case CacheReadStatus.Miss:
-                    _localCache[cacheKey] = null;
                     _logger.LogDebug(
                         "No workflow configuration found in cache for tenant={TenantId}, module={Module}, entity={EntityType}",
                         tenantId, module, entityType);

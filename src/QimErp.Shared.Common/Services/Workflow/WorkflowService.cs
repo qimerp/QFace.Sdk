@@ -20,6 +20,7 @@ public class WorkflowService(
 
     public async Task<bool> ShouldTriggerWorkflow(IWorkflowEnabled entity, string operation, string? module = null)
     {
+        operation = operation.ToUpperInvariant();
         var entityType = entity.EntityType;
         var tenantId = ResolveTenantId(entity);
 
@@ -29,7 +30,7 @@ public class WorkflowService(
             return false;
         }
 
-        var presetCode = operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase) ? entity.WorkflowCode : null;
+        var presetCode = operation == "CREATE" ? entity.WorkflowCode : null;
         var gateState = await WorkflowModuleApprovalGate.EvaluateAsync(
             moduleAccess, configCacheService, definitionProvider, logger, tenantId, module, entityType, presetCode, operation, CancellationToken.None);
         if (gateState == WorkflowApprovalGateState.Unavailable)
@@ -47,7 +48,7 @@ public class WorkflowService(
 
         if (lookup.Config is not { } config)
         {
-            var withoutConfig = await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
+            var (withoutConfig, _) = await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
                 configCacheService, definitionProvider, logger, tenantId, module, entityType, operation, presetCode, CancellationToken.None);
             if (withoutConfig == WorkflowApprovalGateState.Unavailable)
                 throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
@@ -55,7 +56,7 @@ public class WorkflowService(
             return withoutConfig == WorkflowApprovalGateState.On;
         }
 
-        var (enabled, conditions) = operation.ToUpperInvariant() switch
+        var (enabled, conditions) = operation switch
         {
             "CREATE" => (config.EnableWorkflowForCreate, config.CreateTriggerConditions),
             "UPDATE" => (config.EnableWorkflowForUpdate, []),

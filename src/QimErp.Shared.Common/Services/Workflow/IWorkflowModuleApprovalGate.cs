@@ -17,6 +17,7 @@ public interface IWorkflowModuleApprovalGate
         string? tenantId,
         string? module,
         string entityType,
+        string operation,
         string? workflowCode = null,
         CancellationToken cancellationToken = default) =>
         await IsApprovalModuleEnabledAsync(tenantId, cancellationToken)

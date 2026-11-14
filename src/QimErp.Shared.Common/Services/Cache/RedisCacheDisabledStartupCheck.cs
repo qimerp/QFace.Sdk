@@ -7,9 +7,9 @@ internal sealed class RedisCacheDisabledStartupCheck(ILogger<RedisCacheDisabledS
     public Task StartAsync(CancellationToken cancellationToken)
     {
         logger.LogError(
-            "RedisCache:Enabled is false. Shared cache reads report every key as missing, so workflow approval gating " +
-            "cannot see the tenant module snapshot, workflow configuration or published definitions and saves workflow-enabled " +
-            "records without approval. Enable the cache in any environment that relies on approvals.");
+            "RedisCache:Enabled is false. Shared cache reads report every key as missing, including the workflow warm marker, " +
+            "so approval gating refuses saves of workflow-enabled records (503) unless their tenant module snapshot says " +
+            "Workflow is not installed. Enable the cache in any environment that saves workflow-enabled records.");
         return Task.CompletedTask;
     }
 
