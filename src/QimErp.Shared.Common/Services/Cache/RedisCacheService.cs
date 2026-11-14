@@ -58,6 +58,10 @@ public class RedisCacheService(
         }
     }
 
+    /// <remarks>
+    /// With <c>RedisCache:Enabled=false</c> every key reports <see cref="CacheReadStatus.Miss"/>, so approval gating
+    /// sees no workflow configuration and saves without approval; a startup Error is logged for that setting.
+    /// </remarks>
     public async Task<CacheReadResult<T>> ReadEntryAsync<T>(string key, string? region = null)
     {
         if (!_cacheEnabled)

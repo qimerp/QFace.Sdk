@@ -88,6 +88,17 @@ public class CacheEntryReadTests
         read.Value.Should().Be(Snapshot);
     }
 
+    [Fact]
+    public async Task DisabledCache_LogsErrorAtStartup()
+    {
+        var logger = new QimErp.Shared.Common.Tests.Workflow.WorkflowModuleApprovalGateTests.CapturingLogger<RedisCacheDisabledStartupCheck>();
+
+        await new RedisCacheDisabledStartupCheck(logger).StartAsync(default);
+
+        logger.Entries.Should().ContainSingle()
+            .Which.Level.Should().Be(Microsoft.Extensions.Logging.LogLevel.Error);
+    }
+
     private static RedisCacheService Service(Mock<IRedisCacheService> redis) =>
         new(redis.Object, NullLogger<RedisCacheService>.Instance, new ConfigurationBuilder().Build());
 }
