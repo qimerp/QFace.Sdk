@@ -17,6 +17,7 @@ public static class WorkflowApprovalGateMetrics
     public const string MarkerMissing = "marker_missing";
     public const string BoundKeyMissing = "bound_key_missing";
     public const string PresetCodeUnpublished = "preset_code_unpublished";
+    public const string PresetCodeMismatch = "preset_code_mismatch";
     public const string ModuleUnresolved = "module_unresolved";
 
     public const string ConfigSource = "config";

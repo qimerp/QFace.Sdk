@@ -4,7 +4,7 @@ using QimErp.Shared.Common.Services.Cache;
 namespace QimErp.Shared.Common.Services.Workflow;
 
 /// <summary>
-/// Read-only workflow definition provider. A cache miss proves nothing is published only when the tenant warm marker is present.
+/// Read-only workflow definition provider. A cache miss proves nothing is published only alongside a fresh version 2 warm marker that does not name the entity type.
 /// </summary>
 public class WorkflowDefinitionProvider(
     ISharedDistributedCacheService cache,

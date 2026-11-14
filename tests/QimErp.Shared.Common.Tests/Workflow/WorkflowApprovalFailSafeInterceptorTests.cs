@@ -226,6 +226,78 @@ public class WorkflowApprovalFailSafeInterceptorTests
     }
 
     [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public async Task ConfigRequiresCreateApproval_PresetCodeDiffers_RefusesSave(bool gate, bool presetDefinitionActive)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        harness.ConfigCache.SetConfig(ModuleName, CreateApprovalConfig());
+        harness.DefinitionProvider.SetDefinition("CREATE-WF", ActiveDefinition());
+        harness.DefinitionProvider.SetDefinition("OLD-WF", Definition(presetDefinitionActive));
+        using var metrics = new WorkflowModuleApprovalGateTests.GateMetricRecorder();
+
+        var entity = NewEntity();
+        entity.WorkflowCode = "OLD-WF";
+        harness.Context.Add(entity);
+        var save = () => harness.Context.SaveChangesAsync();
+
+        (await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>()).Which.Operation.Should().Be("CREATE");
+        (await harness.Context.Entities.CountAsync()).Should().Be(0);
+        (await harness.Context.OutboxMessages.CountAsync()).Should().Be(0);
+        metrics.Unreadable.Should().Contain(m => m.Source == WorkflowApprovalGateMetrics.PresetCodeMismatch && m.EntityType == nameof(TestWorkflowEntity));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ConfigRequiresCreateApproval_PresetCodeMatches_StartsConfiguredWorkflow(bool gate)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        harness.ConfigCache.SetConfig(ModuleName, CreateApprovalConfig());
+        harness.DefinitionProvider.SetDefinition("CREATE-WF", ActiveDefinition());
+
+        var entity = NewEntity();
+        entity.WorkflowCode = "CREATE-WF";
+        harness.Context.Add(entity);
+        await harness.Context.SaveChangesAsync();
+
+        entity.WorkflowStatus.Should().Be(WorkflowStatus.InProgress);
+        entity.WorkflowCode.Should().Be("CREATE-WF");
+        (await ApprovalRowCountAsync(harness)).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(true, WorkflowCacheWarmStatus.Warm, false)]
+    [InlineData(false, WorkflowCacheWarmStatus.Warm, false)]
+    [InlineData(true, WorkflowCacheWarmStatus.NotWarm, true)]
+    [InlineData(false, WorkflowCacheWarmStatus.NotWarm, true)]
+    public async Task NoConfig_PresetCodeInactive_MarkerDecides(bool gate, WorkflowCacheWarmStatus warm, bool refused)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        harness.DefinitionProvider.SetDefinition("OLD-WF", Definition(active: false));
+        harness.ConfigCache.WarmStatus = warm;
+
+        var entity = NewEntity();
+        entity.WorkflowCode = "OLD-WF";
+        harness.Context.Add(entity);
+        var save = () => harness.Context.SaveChangesAsync();
+
+        if (refused)
+        {
+            await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+            (await harness.Context.Entities.CountAsync()).Should().Be(0);
+        }
+        else
+        {
+            await save();
+            entity.DataStatus.Should().Be(DataState.Active);
+            (await ApprovalRowCountAsync(harness)).Should().Be(0);
+        }
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task ModuleEnabled_WorkflowModuleNotConfigured_RefusesSave(bool gate)
@@ -435,12 +507,14 @@ public class WorkflowApprovalFailSafeInterceptorTests
     private static EntityWorkflowConfig CreateApprovalConfig() =>
         new() { EnableWorkflowForCreate = true, CreateWorkflowCode = "CREATE-WF" };
 
-    private static PublishedWorkflowDefinition ActiveDefinition() =>
+    private static PublishedWorkflowDefinition ActiveDefinition() => Definition(active: true);
+
+    private static PublishedWorkflowDefinition Definition(bool active) =>
         new()
         {
             TenantId = TenantId,
             EntityType = nameof(TestWorkflowEntity),
-            IsActive = true,
+            IsActive = active,
             Definition = new WorkflowDefinition
             {
                 Steps = [new WorkflowStep { StepCode = "STEP-1", Name = "STEP-1", Order = 1 }]

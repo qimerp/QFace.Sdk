@@ -1186,11 +1186,11 @@ public class AuditEntitySaveChangesInterceptor(
             // row — trusting it bypasses the tenant config gate (EnableWorkflowForUpdate /
             // routes) and re-initiates the create workflow on every later save of an
             // approved entity, flipping it back to InProgress.
-            string? workflowCode = operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null;
+            var presetCode = operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null;
+            string? workflowCode = presetCode;
             var skipWorkflowInitiation = false;
             var configMissing = false;
 
-            if (string.IsNullOrWhiteSpace(workflowCode))
             {
                 var module = GetModuleFor(entity);
                 if (string.IsNullOrWhiteSpace(module))
@@ -1209,9 +1209,16 @@ public class AuditEntitySaveChangesInterceptor(
 
                     configMissing = configLookup.Status == WorkflowConfigLookupStatus.Absent;
                     var config = configLookup.Config;
-                    if (config != null)
+                    if (!string.IsNullOrWhiteSpace(presetCode)
+                        && IsCreateWorkflowRequired(config)
+                        && !string.Equals(presetCode, config!.CreateWorkflowCode, StringComparison.OrdinalIgnoreCase))
                     {
-                        entityWorkflowConfig = config;
+                        throw PresetCodeMismatch(tenantId, module, entity.EntityType, presetCode, config.CreateWorkflowCode!);
+                    }
+
+                    entityWorkflowConfig = config;
+                    if (config != null && (string.IsNullOrWhiteSpace(presetCode) || IsCreateWorkflowRequired(config)))
+                    {
                         var changedFields = WorkflowFieldChangeDetector.DetectChangedFields(entry);
 
                         if (IsUserExcluded(config, currentUser, userRoles))
@@ -1384,6 +1391,15 @@ public class AuditEntitySaveChangesInterceptor(
                         "but no active published workflow definition was found. Ensure Platform workflow templates are published for this tenant.");
                 }
 
+                if (operation == "CREATE"
+                    && configMissing
+                    && (await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
+                        configCacheService, definitionProvider, logger, tenantId, gateModule, entity.EntityType, operation, presetCode, cancellationToken)).State
+                    == WorkflowApprovalGateState.Unavailable)
+                {
+                    throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);
+                }
+
                 if (operation == "CREATE" && entry.Entity is AuditableEntity auditableEntity)
                 {
                     auditableEntity.AsActive();
@@ -1492,6 +1508,17 @@ public class AuditEntitySaveChangesInterceptor(
         }
     }
 
+    private WorkflowApprovalStateUnavailableException PresetCodeMismatch(
+        string tenantId, string module, string entityType, string presetCode, string configuredCode)
+    {
+        logger.LogError(
+            "{EntityType} create carries WorkflowCode {PresetCode} but tenant {TenantId} requires {ConfiguredCode} — refusing",
+            entityType, presetCode, tenantId, configuredCode);
+        WorkflowApprovalGateMetrics.RecordStateUnreadable(
+            WorkflowApprovalGateMetrics.PresetCodeMismatch, module, entityType, "CREATE");
+        return new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, "CREATE");
+    }
+
     private WorkflowApprovalStateUnavailableException ModuleNotConfigured(string tenantId, string entityType, string operation)
     {
         logger.LogError(
@@ -1502,7 +1529,7 @@ public class AuditEntitySaveChangesInterceptor(
         return new WorkflowApprovalStateUnavailableException(tenantId, null, entityType, operation);
     }
 
-    private static bool IsCreateWorkflowRequired(EntityWorkflowConfig? config) =>
+    private static bool IsCreateWorkflowRequired([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] EntityWorkflowConfig? config) =>
         config?.EnableWorkflowForCreate == true
         && !string.IsNullOrWhiteSpace(config.CreateWorkflowCode);
 

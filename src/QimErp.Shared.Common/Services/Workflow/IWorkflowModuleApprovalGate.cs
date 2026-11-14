@@ -11,7 +11,9 @@ public interface IWorkflowModuleApprovalGate
 
     /// <remarks>
     /// On <see cref="WorkflowApprovalGateState.Unavailable"/> throw <see cref="WorkflowApprovalStateUnavailableException"/>; never save without approval.
-    /// For CREATE pass the entity's preset WorkflowCode so that code's definition is checked instead of the entity type's.
+    /// For CREATE pass the entity's preset WorkflowCode: it must match a configured create workflow, is otherwise checked
+    /// first and falls back to the entity type's definition, and a mismatch is refused.
+    /// The default implementation, for gates that predate this method, returns Unavailable unless the module is enabled.
     /// </remarks>
     async Task<WorkflowApprovalGateState> GetApprovalStateAsync(
         string? tenantId,
@@ -22,5 +24,5 @@ public interface IWorkflowModuleApprovalGate
         CancellationToken cancellationToken = default) =>
         await IsApprovalModuleEnabledAsync(tenantId, cancellationToken)
             ? WorkflowApprovalGateState.On
-            : WorkflowApprovalGateState.Off;
+            : WorkflowApprovalGateState.Unavailable;
 }

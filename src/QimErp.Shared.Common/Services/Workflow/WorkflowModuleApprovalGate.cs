@@ -103,6 +103,20 @@ public sealed class WorkflowModuleApprovalGate(
         var lookup = await configCache.LookupEntityConfigAsync(module, entityType, tenantId);
         if (lookup.Status == WorkflowConfigLookupStatus.Found)
         {
+            if (operation == "CREATE"
+                && !string.IsNullOrWhiteSpace(workflowCode)
+                && lookup.Config is { EnableWorkflowForCreate: true, CreateWorkflowCode: { Length: > 0 } configuredCode }
+                && !string.Equals(workflowCode, configuredCode, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogError(
+                    "[WorkflowModuleApprovalGate] {EntityType} create carries WorkflowCode {PresetCode} but tenant {TenantId} requires {ConfiguredCode} — refusing the write",
+                    entityType, workflowCode, tenantId, configuredCode);
+                WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                    WorkflowApprovalGateMetrics.PresetCodeMismatch, module, entityType, operation);
+                Warn(WorkflowApprovalGateState.Unavailable, WorkflowApprovalGateMetrics.PresetCodeMismatch);
+                return WorkflowApprovalGateState.Unavailable;
+            }
+
             Warn(WorkflowApprovalGateState.On, WorkflowApprovalGateMetrics.ConfigFound);
             return WorkflowApprovalGateState.On;
         }

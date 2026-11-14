@@ -15,7 +15,11 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<WorkflowConfigCacheService> _logger;
     private readonly ConcurrentDictionary<string, EntityWorkflowConfig> _localCache = new();
-    private readonly ConcurrentDictionary<string, WorkflowTenantWarmMarker> _warmMarkers = new();
+    private static readonly TimeSpan WarmMarkerReuseWindow = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan WarmMarkerClockSkew = TimeSpan.FromMinutes(5);
+    private static int _invalidMaxAgeLogged;
+
+    private readonly ConcurrentDictionary<string, (WorkflowTenantWarmMarker Marker, DateTimeOffset ReadAt)> _warmMarkers = new();
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _warmMarkerMaxAge;
 
@@ -38,11 +42,31 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
         _tenantContext = tenantContext;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _warmMarkerMaxAge = TimeSpan.TryParse(
-            configuration?[WorkflowTenantWarmMarker.MaxAgeSettingKey], CultureInfo.InvariantCulture, out var configured)
-            && configured > TimeSpan.Zero
-                ? configured
-                : WorkflowTenantWarmMarker.DefaultMaxAge;
+        _warmMarkerMaxAge = ResolveWarmMarkerMaxAge(configuration?[WorkflowTenantWarmMarker.MaxAgeSettingKey]);
+    }
+
+    private TimeSpan ResolveWarmMarkerMaxAge(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+            return WorkflowTenantWarmMarker.DefaultMaxAge;
+
+        if (configured.Contains(':')
+            && TimeSpan.TryParse(configured, CultureInfo.InvariantCulture, out var maxAge)
+            && maxAge > TimeSpan.Zero
+            && maxAge <= WorkflowTenantWarmMarker.DefaultMaxAge)
+        {
+            return maxAge;
+        }
+
+        if (Interlocked.Exchange(ref _invalidMaxAgeLogged, 1) == 0)
+        {
+            _logger.LogError(
+                "{Setting}='{Value}' is not a positive hh:mm:ss duration of at most {Cap}; using {Cap}",
+                WorkflowTenantWarmMarker.MaxAgeSettingKey, configured, WorkflowTenantWarmMarker.DefaultMaxAge,
+                WorkflowTenantWarmMarker.DefaultMaxAge);
+        }
+
+        return WorkflowTenantWarmMarker.DefaultMaxAge;
     }
 
     public async Task<EntityWorkflowConfig?> GetEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
@@ -58,7 +82,13 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
             return WorkflowCacheWarmStatus.NotWarm;
 
         var cacheKey = WorkflowDefinitionCacheKeys.TenantWarmMarker(resolvedTenantId);
-        if (!_warmMarkers.TryGetValue(cacheKey, out var marker))
+        var now = _timeProvider.GetUtcNow();
+        WorkflowTenantWarmMarker marker;
+        if (_warmMarkers.TryGetValue(cacheKey, out var cached) && now - cached.ReadAt <= WarmMarkerReuseWindow)
+        {
+            marker = cached.Marker;
+        }
+        else
         {
             try
             {
@@ -69,37 +99,43 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
                         marker = read.Value;
                         break;
                     case CacheReadStatus.Miss:
+                        _warmMarkers.TryRemove(cacheKey, out _);
                         return WorkflowCacheWarmStatus.NotWarm;
                     default:
+                        _warmMarkers.TryRemove(cacheKey, out _);
                         _logger.LogWarning("Workflow warm marker could not be read for tenant={TenantId}", resolvedTenantId);
                         return WorkflowCacheWarmStatus.Unknown;
                 }
             }
             catch (Exception ex)
             {
+                _warmMarkers.TryRemove(cacheKey, out _);
                 _logger.LogError(ex, "Error reading workflow warm marker for tenant={TenantId}", resolvedTenantId);
                 return WorkflowCacheWarmStatus.Unknown;
             }
-
-            if (!marker.IsBoundSetPresent)
-            {
-                _logger.LogWarning(
-                    "Workflow warm marker for tenant={TenantId} is version {Version} without a Bound set; treating the cache as not warm",
-                    resolvedTenantId, marker.Version);
-                return WorkflowCacheWarmStatus.NotWarm;
-            }
-
-            _warmMarkers[cacheKey] = marker;
         }
 
-        var age = _timeProvider.GetUtcNow() - marker.WarmedAt;
-        if (age > _warmMarkerMaxAge)
+        if (!marker.IsBoundSetPresent)
         {
+            _warmMarkers.TryRemove(cacheKey, out _);
             _logger.LogWarning(
-                "Workflow warm marker for tenant={TenantId} was written {Age} ago, beyond {MaxAge}; treating the cache as not warm",
-                resolvedTenantId, age, _warmMarkerMaxAge);
+                "Workflow warm marker for tenant={TenantId} is version {Version} without a Bound set; treating the cache as not warm",
+                resolvedTenantId, marker.Version);
             return WorkflowCacheWarmStatus.NotWarm;
         }
+
+        var age = now - marker.WarmedAt;
+        if (age > _warmMarkerMaxAge || -age > WarmMarkerClockSkew)
+        {
+            _warmMarkers.TryRemove(cacheKey, out _);
+            _logger.LogWarning(
+                "Workflow warm marker for tenant={TenantId} has warmedAt {WarmedAt}, outside the accepted window (max age {MaxAge}); treating the cache as not warm",
+                resolvedTenantId, marker.WarmedAt, _warmMarkerMaxAge);
+            return WorkflowCacheWarmStatus.NotWarm;
+        }
+
+        if (!_warmMarkers.TryGetValue(cacheKey, out var current) || !ReferenceEquals(current.Marker, marker))
+            _warmMarkers[cacheKey] = (marker, now);
 
         return marker.IsBound(module, entityType)
             ? WorkflowCacheWarmStatus.BoundAtWarm

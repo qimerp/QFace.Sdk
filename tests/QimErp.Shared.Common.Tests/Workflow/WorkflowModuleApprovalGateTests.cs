@@ -261,7 +261,7 @@ public class WorkflowModuleApprovalGateTests
         var redis = new InMemoryGlobalRedis();
         await redis.SetAsync(
             WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId),
-            new WorkflowTenantWarmMarker { WarmedAt = DateTimeOffset.UtcNow, Bound = [] });
+            new WorkflowTenantWarmMarker { WarmedAt = DateTimeOffset.UtcNow, Version = 2, Bound = [] });
 
         (await RealGate(redis).GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE")).Should().Be(WorkflowApprovalGateState.Off);
     }
@@ -285,7 +285,7 @@ public class WorkflowModuleApprovalGateTests
         redis.Down = false;
         await redis.SetAsync(
             WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId),
-            new WorkflowTenantWarmMarker { WarmedAt = DateTimeOffset.UtcNow, Bound = [] });
+            new WorkflowTenantWarmMarker { WarmedAt = DateTimeOffset.UtcNow, Version = 2, Bound = [] });
         (await cache.GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.Warm);
         WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId).Should().Be($"qface:qimerp:workflow:warm:{TenantId}");
     }
@@ -433,6 +433,107 @@ public class WorkflowModuleApprovalGateTests
             WorkflowConfigLookup.Found(new EntityWorkflowConfig { EnableWorkflowForCreate = true, CreateWorkflowCode = "WF" }));
 
         var act = () => validation.RequiresApprovalAsync(NewEntity(), "CREATE");
+
+        await act.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+    }
+
+    [Fact]
+    public async Task RealServices_BoundEntryForAnotherModule_SameEntityType_IsUnavailable()
+    {
+        var redis = new InMemoryGlobalRedis();
+        await SeedMarkerAsync(redis, DateTimeOffset.UtcNow, bound: [$"Leave:{EntityType.ToLowerInvariant()}"]);
+
+        (await ConfigCache(redis).GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.BoundAtWarm);
+        (await RealGate(redis).GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE"))
+            .Should().Be(WorkflowApprovalGateState.Unavailable);
+    }
+
+    [Theory]
+    [InlineData(4, WorkflowCacheWarmStatus.Warm)]
+    [InlineData(6, WorkflowCacheWarmStatus.NotWarm)]
+    public async Task WarmMarker_DatedInTheFuture_IsNotWarmBeyondFiveMinutes(int minutesAhead, WorkflowCacheWarmStatus expected)
+    {
+        var redis = new InMemoryGlobalRedis();
+        var clock = new MutableClock(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
+        await SeedMarkerAsync(redis, clock.Now.AddMinutes(minutesAhead), bound: []);
+
+        (await ConfigCache(redis, clock).GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("48")]
+    [InlineData("72:00:00")]
+    [InlineData("3.00:00:00")]
+    [InlineData("-01:00:00")]
+    [InlineData("soon")]
+    public async Task WarmMarkerMaxAge_InvalidOrAboveCap_FallsBackTo48Hours(string configured)
+    {
+        var redis = new InMemoryGlobalRedis();
+        var clock = new MutableClock(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
+        await SeedMarkerAsync(redis, clock.Now.AddHours(-49), bound: []);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [WorkflowTenantWarmMarker.MaxAgeSettingKey] = configured })
+            .Build();
+        var cache = new WorkflowConfigCacheService(
+            SharedCache(redis), new TenantContext(), NullLogger<WorkflowConfigCacheService>.Instance, configuration, clock);
+
+        (await cache.GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
+    }
+
+    [Fact]
+    public async Task WarmMarker_WarmResultReusedForAtMostSixtySeconds()
+    {
+        var redis = new InMemoryGlobalRedis();
+        var clock = new MutableClock(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
+        await SeedMarkerAsync(redis, clock.Now, bound: []);
+        var cache = ConfigCache(redis, clock);
+
+        (await cache.GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.Warm);
+        await redis.RemoveAsync(WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId));
+        clock.Now = clock.Now.AddSeconds(30);
+        (await cache.GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.Warm);
+        clock.Now = clock.Now.AddSeconds(31);
+        (await cache.GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
+    }
+
+    [Fact]
+    public async Task WarmMarker_JsonWithoutVersion_IsNotWarm()
+    {
+        var marker = Newtonsoft.Json.JsonConvert.DeserializeObject<WorkflowTenantWarmMarker>(
+            """{ "warmedAt": "2026-11-14T11:00:00Z", "bound": [] }""")!;
+        var redis = new InMemoryGlobalRedis();
+        await redis.SetAsync(WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId), marker);
+        var clock = new MutableClock(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
+
+        marker.Version.Should().Be(0);
+        (await ConfigCache(redis, clock).GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
+    }
+
+    [Theory]
+    [InlineData("OLD-WF", true, WorkflowApprovalGateState.Unavailable)]
+    [InlineData("create-wf", true, WorkflowApprovalGateState.On)]
+    [InlineData("OLD-WF", false, WorkflowApprovalGateState.On)]
+    public async Task ConfigFound_PresetCodeMustMatchConfiguredCreateWorkflow(
+        string presetCode, bool createEnabled, WorkflowApprovalGateState expected)
+    {
+        var gate = Gate(ModuleAccess.Enabled, new FakeLookupConfigCache(WorkflowConfigLookup.Found(
+            new EntityWorkflowConfig { EnableWorkflowForCreate = createEnabled, CreateWorkflowCode = "CREATE-WF" })));
+        using var metrics = new GateMetricRecorder();
+
+        (await gate.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE", presetCode)).Should().Be(expected);
+        if (expected == WorkflowApprovalGateState.Unavailable)
+            metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.PresetCodeMismatch, Module, EntityType, "CREATE"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task ShouldTriggerWorkflow_WithoutModule_Refuses(string? module)
+    {
+        var service = WorkflowServiceFor(ModuleAccess.Enabled, WorkflowConfigLookup.Found(
+            new EntityWorkflowConfig { EnableWorkflowForCreate = true, CreateWorkflowCode = "WF" }));
+
+        var act = () => service.ShouldTriggerWorkflow(NewEntity(), "CREATE", module);
 
         await act.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
     }
@@ -663,7 +764,7 @@ public class WorkflowModuleApprovalGateTests
             .Should().Be(WorkflowConfigLookupStatus.Absent);
         (await legacyFound.LookupEntityConfigAsync(Module, EntityType, TenantId)).Status
             .Should().Be(WorkflowConfigLookupStatus.Found);
-        (await legacyOff.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE")).Should().Be(WorkflowApprovalGateState.Off);
+        (await legacyOff.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE")).Should().Be(WorkflowApprovalGateState.Unavailable);
         (await legacyOn.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE")).Should().Be(WorkflowApprovalGateState.On);
     }
 
@@ -719,6 +820,9 @@ public class WorkflowModuleApprovalGateTests
 
         public override DateTimeOffset GetUtcNow() => Now;
     }
+
+    private static WorkflowConfigCacheService ConfigCache(InMemoryGlobalRedis redis, TimeProvider clock) =>
+        new(SharedCache(redis), new TenantContext(), NullLogger<WorkflowConfigCacheService>.Instance, null, clock);
 
     private static WorkflowConfigCacheService ConfigCache(InMemoryGlobalRedis redis) =>
         new(SharedCache(redis), new TenantContext(), NullLogger<WorkflowConfigCacheService>.Instance);
@@ -830,7 +934,7 @@ public class WorkflowModuleApprovalGateTests
             Task.FromResult(enabled);
     }
 
-    private sealed class GateMetricRecorder : IDisposable
+    internal sealed class GateMetricRecorder : IDisposable
     {
         private readonly MeterListener _listener = new();
         private readonly List<(string Outcome, string Module, string EntityType)> _outcomes = [];

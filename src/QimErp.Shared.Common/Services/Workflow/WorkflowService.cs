@@ -26,8 +26,12 @@ public class WorkflowService(
 
         if (string.IsNullOrWhiteSpace(module))
         {
-            logger.LogDebug("Module not provided for ShouldTriggerWorkflow. Skipping workflow configuration check for {EntityType}", entityType);
-            return false;
+            logger.LogError(
+                "No workflow module given for {EntityType} {Operation}; cannot decide whether approval is needed — refusing",
+                entityType, operation);
+            WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                WorkflowApprovalGateMetrics.ModuleUnresolved, null, entityType, operation);
+            throw new WorkflowApprovalStateUnavailableException(tenantId, null, entityType, operation);
         }
 
         var presetCode = operation == "CREATE" ? entity.WorkflowCode : null;
