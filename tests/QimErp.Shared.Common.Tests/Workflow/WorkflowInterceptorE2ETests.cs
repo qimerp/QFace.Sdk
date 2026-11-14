@@ -564,6 +564,11 @@ internal sealed class FakeWorkflowConfigCacheService : IWorkflowConfigCacheServi
 
     public bool Unreadable { get; set; }
 
+    public WorkflowCacheWarmStatus WarmStatus { get; set; } = WorkflowCacheWarmStatus.Warm;
+
+    public Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string? tenantId = null) =>
+        Task.FromResult(WarmStatus);
+
     public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null)
     {
         if (Unreadable)

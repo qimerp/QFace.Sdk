@@ -908,16 +908,25 @@ public class AuditEntitySaveChangesInterceptor(
 
                 if (definitionProvider != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(workflowCode))
-                    {
-                        publishedDefinition = await definitionProvider.GetPublishedDefinitionAsync(
-                            resolvedTenantId, workflowCode, entity.EntityType, cancellationToken);
-                    }
-                    else
-                    {
-                        publishedDefinition = await definitionProvider.GetPublishedDefinitionByEntityTypeAsync(
+                    var handOffLookup = !string.IsNullOrWhiteSpace(workflowCode)
+                        ? await definitionProvider.LookupPublishedDefinitionAsync(
+                            resolvedTenantId, workflowCode, entity.EntityType, cancellationToken)
+                        : await definitionProvider.LookupPublishedDefinitionByEntityTypeAsync(
                             resolvedTenantId, entity.EntityType, cancellationToken);
+
+                    var handOffGate = serviceProvider.GetService<IWorkflowModuleApprovalGate>();
+                    if (handOffLookup.Status == WorkflowDefinitionLookupStatus.Unknown
+                        && (handOffGate is null
+                            || await handOffGate.IsApprovalModuleEnabledAsync(resolvedTenantId, cancellationToken)))
+                    {
+                        var handOffOperation = entry.State == EntityState.Added ? "CREATE" : "UPDATE";
+                        WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                            WorkflowApprovalGateMetrics.DefinitionSource, GetModuleFor(entity), entity.EntityType, handOffOperation);
+                        throw new WorkflowApprovalStateUnavailableException(
+                            resolvedTenantId, GetModuleFor(entity), entity.EntityType, handOffOperation);
                     }
+
+                    publishedDefinition = handOffLookup.Definition;
 
                     if (publishedDefinition != null && string.IsNullOrWhiteSpace(workflowCode))
                     {
@@ -1145,7 +1154,11 @@ public class AuditEntitySaveChangesInterceptor(
             var approvalState = approvalGate is null
                 ? WorkflowApprovalGateState.On
                 : await approvalGate.GetApprovalStateAsync(
-                    tenantId, gateModule, entity.EntityType, cancellationToken);
+                    tenantId,
+                    gateModule,
+                    entity.EntityType,
+                    operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null,
+                    cancellationToken);
 
             if (approvalState == WorkflowApprovalGateState.Unavailable)
                 throw new WorkflowApprovalStateUnavailableException(
@@ -1181,7 +1194,7 @@ public class AuditEntitySaveChangesInterceptor(
                 var module = GetModuleFor(entity);
                 if (string.IsNullOrWhiteSpace(module))
                 {
-                    logger.LogWarning("Module not configured in appsettings. Skipping workflow configuration lookup for {EntityType}", entity.EntityType);
+                    throw ModuleNotConfigured(tenantId, entity.EntityType, operation);
                 }
                 else
                 {
@@ -1249,16 +1262,12 @@ public class AuditEntitySaveChangesInterceptor(
                 }
             }
 
-            // UPDATE/DELETE workflows start only from an explicit tenant config route.
-            // When none resolved (gate disabled, no matching route, config missing from
-            // cache), never fall through to the published-definition lookups below — the
-            // by-entity-type fallback resolves the CREATE definition and would wrongly
-            // initiate it for this save.
+            // UPDATE/DELETE never fall back to the by-entity definition: it resolves the CREATE workflow.
             if (operation is "UPDATE" or "DELETE" && string.IsNullOrWhiteSpace(workflowCode))
             {
                 if (configMissing
                     && await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
-                        definitionProvider, logger, tenantId, gateModule, entity.EntityType, operation, cancellationToken)
+                        configCacheService, definitionProvider, logger, tenantId, gateModule, entity.EntityType, operation, null, cancellationToken)
                     == WorkflowApprovalGateState.Unavailable)
                 {
                     throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);
@@ -1388,13 +1397,7 @@ public class AuditEntitySaveChangesInterceptor(
                 var module = GetModuleFor(entity);
                 if (string.IsNullOrWhiteSpace(module))
                 {
-                    logger.LogWarning("Module not configured. Cannot check ShouldTriggerWorkflow for {EntityType}", entity.EntityType);
-
-                    if (operation == "CREATE" && entry.Entity is AuditableEntity auditableEntity)
-                    {
-                        auditableEntity.AsActive();
-                        logger.LogDebug("Module not configured for workflow checks. Keeping {EntityType} active on create.", entity.EntityType);
-                    }
+                    throw ModuleNotConfigured(tenantId, entity.EntityType, operation);
                 }
                 else
                 {
@@ -1486,6 +1489,16 @@ public class AuditEntitySaveChangesInterceptor(
                 logger.LogDebug("Create operation for {EntityType} finished without workflow initiation. Enforced active status.", entity.EntityType);
             }
         }
+    }
+
+    private WorkflowApprovalStateUnavailableException ModuleNotConfigured(string tenantId, string entityType, string operation)
+    {
+        logger.LogError(
+            "Workflow:Module is not configured for {EntityType} (tenant {TenantId}) — refusing {Operation}",
+            entityType, tenantId, operation);
+        WorkflowApprovalGateMetrics.RecordStateUnreadable(
+            WorkflowApprovalGateMetrics.ModuleUnresolved, null, entityType, operation);
+        return new WorkflowApprovalStateUnavailableException(tenantId, null, entityType, operation);
     }
 
     private static bool IsCreateWorkflowRequired(EntityWorkflowConfig? config) =>
@@ -1587,7 +1600,7 @@ public class AuditEntitySaveChangesInterceptor(
     {
         if (configuration == null)
         {
-            logger.LogWarning("IConfiguration not available. Cannot determine module name.");
+            logger.LogError("IConfiguration not available. Cannot determine module name.");
             return string.Empty;
         }
 
@@ -1598,7 +1611,7 @@ public class AuditEntitySaveChangesInterceptor(
 
         if (string.IsNullOrWhiteSpace(module))
         {
-            logger.LogWarning("Workflow:Module not configured in appsettings.json. Workflow configurations will not be loaded.");
+            logger.LogError("Workflow:Module not configured in appsettings.json. Saves of workflow-enabled entities will be refused.");
             return string.Empty;
         }
 

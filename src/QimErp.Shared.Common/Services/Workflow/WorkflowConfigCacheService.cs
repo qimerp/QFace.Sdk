@@ -15,6 +15,7 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<WorkflowConfigCacheService> _logger;
     private readonly ConcurrentDictionary<string, EntityWorkflowConfig?> _localCache = new();
+    private readonly ConcurrentDictionary<string, bool> _warmTenants = new();
 
     public WorkflowConfigCacheService(
         ISharedDistributedCacheService cache,
@@ -31,6 +32,38 @@ public class WorkflowConfigCacheService : IWorkflowConfigCacheService
 
     public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null) =>
         LookupEntityConfigInternalAsync(ResolveTenantId(tenantId), module, entityType);
+
+    public async Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string? tenantId = null)
+    {
+        var resolvedTenantId = ResolveTenantId(tenantId);
+        if (string.IsNullOrWhiteSpace(resolvedTenantId))
+            return WorkflowCacheWarmStatus.NotWarm;
+
+        var cacheKey = WorkflowDefinitionCacheKeys.TenantWarmMarker(resolvedTenantId);
+        if (_warmTenants.ContainsKey(cacheKey))
+            return WorkflowCacheWarmStatus.Warm;
+
+        try
+        {
+            var read = await _cache.ReadEntryAsync<WorkflowTenantWarmMarker>(cacheKey);
+            switch (read.Status)
+            {
+                case CacheReadStatus.Hit when read.Value is not null:
+                    _warmTenants[cacheKey] = true;
+                    return WorkflowCacheWarmStatus.Warm;
+                case CacheReadStatus.Miss:
+                    return WorkflowCacheWarmStatus.NotWarm;
+                default:
+                    _logger.LogWarning("Workflow warm marker could not be read for tenant={TenantId}", resolvedTenantId);
+                    return WorkflowCacheWarmStatus.Unknown;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reading workflow warm marker for tenant={TenantId}", resolvedTenantId);
+            return WorkflowCacheWarmStatus.Unknown;
+        }
+    }
 
     public async Task<bool> IsWorkflowEnabledAsync(string module, string entityType, string operation, string? tenantId = null)
     {

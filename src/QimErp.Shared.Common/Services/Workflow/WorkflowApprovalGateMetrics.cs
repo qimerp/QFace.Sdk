@@ -14,6 +14,7 @@ public static class WorkflowApprovalGateMetrics
     public const string DefinitionFound = "definition_found";
     public const string DefinitionUnknown = "definition_unknown";
     public const string NothingBound = "nothing_bound";
+    public const string MarkerMissing = "marker_missing";
     public const string ModuleUnresolved = "module_unresolved";
 
     public const string ConfigSource = "config";

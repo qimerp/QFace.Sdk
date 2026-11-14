@@ -29,8 +29,9 @@ public class WorkflowService(
             return false;
         }
 
+        var presetCode = operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase) ? entity.WorkflowCode : null;
         var gateState = await WorkflowModuleApprovalGate.EvaluateAsync(
-            moduleAccess, configCacheService, definitionProvider, logger, tenantId, module, entityType, CancellationToken.None);
+            moduleAccess, configCacheService, definitionProvider, logger, tenantId, module, entityType, presetCode, operation, CancellationToken.None);
         if (gateState == WorkflowApprovalGateState.Unavailable)
             throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
         if (gateState == WorkflowApprovalGateState.Off)
@@ -47,7 +48,7 @@ public class WorkflowService(
         if (lookup.Config is not { } config)
         {
             var withoutConfig = await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
-                definitionProvider, logger, tenantId, module, entityType, operation, CancellationToken.None);
+                configCacheService, definitionProvider, logger, tenantId, module, entityType, operation, presetCode, CancellationToken.None);
             if (withoutConfig == WorkflowApprovalGateState.Unavailable)
                 throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
 

@@ -3,8 +3,7 @@ using QimErp.Shared.Common.Services.Cache;
 namespace QimErp.Shared.Common.Services.Workflow;
 
 /// <summary>
-/// Read-only workflow definition provider. Redis is the runtime source of truth —
-/// a cache miss means no published workflow exists for that tenant/entity.
+/// Read-only workflow definition provider. A cache miss proves nothing is published only when the tenant warm marker is present.
 /// </summary>
 public class WorkflowDefinitionProvider(
     ISharedDistributedCacheService cache,

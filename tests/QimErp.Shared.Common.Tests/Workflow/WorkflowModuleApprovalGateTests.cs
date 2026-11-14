@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Diagnostics.Metrics;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -28,16 +29,98 @@ public class WorkflowModuleApprovalGateTests
     private const string Module = "HR";
     private const string EntityType = "Employee";
 
-    [Theory]
-    [InlineData(ModuleAccess.Enabled, WorkflowApprovalGateState.On)]
-    [InlineData(ModuleAccess.NotInstalled, WorkflowApprovalGateState.Off)]
-    public async Task KnownModuleState_DecidesWithoutReadingConfig(ModuleAccess access, WorkflowApprovalGateState expected)
+    [Fact]
+    public async Task ModuleNotInstalled_IsOffWithoutReadingConfig()
     {
         var config = new FakeLookupConfigCache(WorkflowConfigLookup.Unknown);
-        var gate = Gate(access, config);
+
+        (await Gate(ModuleAccess.NotInstalled, config).GetApprovalStateAsync(TenantId, Module, EntityType))
+            .Should().Be(WorkflowApprovalGateState.Off);
+        config.LookupCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Enabled)]
+    [InlineData(ModuleAccess.Unknown)]
+    public async Task NothingBound_MarkerPresent_IsOff(ModuleAccess access)
+    {
+        var gate = Gate(access, new FakeLookupConfigCache(WorkflowConfigLookup.Absent, WorkflowCacheWarmStatus.Warm),
+            Definitions(WorkflowDefinitionLookupStatus.Absent));
+
+        (await gate.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.Off);
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Enabled, WorkflowCacheWarmStatus.NotWarm)]
+    [InlineData(ModuleAccess.Enabled, WorkflowCacheWarmStatus.Unknown)]
+    [InlineData(ModuleAccess.Unknown, WorkflowCacheWarmStatus.NotWarm)]
+    [InlineData(ModuleAccess.Unknown, WorkflowCacheWarmStatus.Unknown)]
+    public async Task NothingBound_MarkerMissingOrUnreadable_IsUnavailable(ModuleAccess access, WorkflowCacheWarmStatus warm)
+    {
+        var gate = Gate(access, new FakeLookupConfigCache(WorkflowConfigLookup.Absent, warm),
+            Definitions(WorkflowDefinitionLookupStatus.Absent));
+        using var metrics = new GateMetricRecorder();
+
+        (await gate.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.Unavailable);
+        metrics.Unreadable.Should().Contain(m => m.Source == WorkflowApprovalGateMetrics.MarkerMissing && m.EntityType == EntityType);
+        if (access == ModuleAccess.Unknown)
+            metrics.Outcomes.Should().Contain((WorkflowApprovalGateMetrics.MarkerMissing, Module, EntityType));
+    }
+
+    [Theory]
+    [InlineData(WorkflowCacheWarmStatus.Warm, WorkflowApprovalGateState.Off)]
+    [InlineData(WorkflowCacheWarmStatus.NotWarm, WorkflowApprovalGateState.Unavailable)]
+    public async Task InactiveDefinition_CountsAsNothingBound(WorkflowCacheWarmStatus warm, WorkflowApprovalGateState expected)
+    {
+        var gate = Gate(ModuleAccess.Unknown, new FakeLookupConfigCache(WorkflowConfigLookup.Absent, warm),
+            new FixedDefinitionProvider(WorkflowDefinitionLookup.Absent, WorkflowDefinitionLookup.Found(Published(active: false))));
+        using var metrics = new GateMetricRecorder();
 
         (await gate.GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(expected);
-        config.LookupCount.Should().Be(0);
+        metrics.Outcomes.Should().NotContain(o => o.Outcome == WorkflowApprovalGateMetrics.DefinitionFound && o.EntityType == EntityType);
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Enabled)]
+    [InlineData(ModuleAccess.Unknown)]
+    public async Task CreateWithPresetCode_ChecksThatCode(ModuleAccess access)
+    {
+        var codeFound = Gate(access, new FakeLookupConfigCache(WorkflowConfigLookup.Absent, WorkflowCacheWarmStatus.NotWarm),
+            new FixedDefinitionProvider(WorkflowDefinitionLookup.Found(Published()), WorkflowDefinitionLookup.Absent));
+        var codeMissingEntityTypeActive = Gate(access, new FakeLookupConfigCache(WorkflowConfigLookup.Absent, WorkflowCacheWarmStatus.Warm),
+            new FixedDefinitionProvider(WorkflowDefinitionLookup.Absent, WorkflowDefinitionLookup.Found(Published())));
+
+        (await codeFound.GetApprovalStateAsync(TenantId, Module, EntityType, "X-WF")).Should().Be(WorkflowApprovalGateState.On);
+        (await codeMissingEntityTypeActive.GetApprovalStateAsync(TenantId, Module, EntityType, "X-WF"))
+            .Should().Be(WorkflowApprovalGateState.Off);
+    }
+
+    [Theory]
+    [InlineData(WorkflowConfigLookupStatus.Found, WorkflowApprovalGateState.On)]
+    [InlineData(WorkflowConfigLookupStatus.Unknown, WorkflowApprovalGateState.Unavailable)]
+    public async Task ModuleEnabled_ConfigDecides(WorkflowConfigLookupStatus status, WorkflowApprovalGateState expected)
+    {
+        var lookup = status == WorkflowConfigLookupStatus.Found
+            ? WorkflowConfigLookup.Found(new EntityWorkflowConfig())
+            : WorkflowConfigLookup.Unknown;
+        using var metrics = new GateMetricRecorder();
+
+        (await Gate(ModuleAccess.Enabled, new FakeLookupConfigCache(lookup, WorkflowCacheWarmStatus.NotWarm))
+                .GetApprovalStateAsync(TenantId, Module, EntityType))
+            .Should().Be(expected);
+        if (status == WorkflowConfigLookupStatus.Unknown)
+            metrics.Unreadable.Should().Contain(m => m.Source == WorkflowApprovalGateMetrics.ConfigSource && m.EntityType == EntityType);
+    }
+
+    [Fact]
+    public async Task ModuleEnabled_NoWorkflowModuleName_IsUnavailableAndLogsError()
+    {
+        var logger = new CapturingLogger<WorkflowModuleApprovalGate>();
+        var gate = new WorkflowModuleApprovalGate(
+            new ScriptedModuleAccessService(ModuleAccess.Enabled), new FakeLookupConfigCache(WorkflowConfigLookup.Found(new EntityWorkflowConfig())), logger);
+
+        (await gate.GetApprovalStateAsync(TenantId, " ", EntityType)).Should().Be(WorkflowApprovalGateState.Unavailable);
+        logger.Entries.Should().Contain(e => e.Level == LogLevel.Error && e.Message.Contains(EntityType));
     }
 
     [Fact]
@@ -173,10 +256,46 @@ public class WorkflowModuleApprovalGateTests
     }
 
     [Fact]
-    public async Task RealServices_SnapshotMissing_NothingPublished_IsOff()
+    public async Task RealServices_SnapshotMissing_NothingPublished_MarkerPresent_IsOff()
+    {
+        var redis = new InMemoryGlobalRedis();
+        await redis.SetAsync(
+            WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId),
+            new WorkflowTenantWarmMarker { WarmedAt = DateTimeOffset.UtcNow });
+
+        (await RealGate(redis).GetApprovalStateAsync(TenantId, Module, EntityType)).Should().Be(WorkflowApprovalGateState.Off);
+    }
+
+    [Fact]
+    public async Task RealServices_SnapshotMissing_NothingPublished_MarkerMissing_IsUnavailable()
     {
         (await RealGate(new InMemoryGlobalRedis()).GetApprovalStateAsync(TenantId, Module, EntityType))
-            .Should().Be(WorkflowApprovalGateState.Off);
+            .Should().Be(WorkflowApprovalGateState.Unavailable);
+    }
+
+    [Fact]
+    public async Task WarmMarker_WarmNotWarmAndUnknown()
+    {
+        var redis = new InMemoryGlobalRedis();
+        var cache = ConfigCache(redis);
+
+        (await cache.GetTenantWarmStatusAsync(TenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
+        redis.Down = true;
+        (await cache.GetTenantWarmStatusAsync(TenantId)).Should().Be(WorkflowCacheWarmStatus.Unknown);
+        redis.Down = false;
+        await redis.SetAsync(
+            WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId),
+            new WorkflowTenantWarmMarker { WarmedAt = DateTimeOffset.UtcNow });
+        (await cache.GetTenantWarmStatusAsync(TenantId)).Should().Be(WorkflowCacheWarmStatus.Warm);
+        WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId).Should().Be($"qface:qimerp:workflow:warm:{TenantId}");
+    }
+
+    [Fact]
+    public async Task WarmMarker_DefaultImplementation_IsUnknown()
+    {
+        IWorkflowConfigCacheService legacy = new LegacyConfigCache(null);
+
+        (await legacy.GetTenantWarmStatusAsync(TenantId)).Should().Be(WorkflowCacheWarmStatus.Unknown);
     }
 
     [Fact]
@@ -224,12 +343,39 @@ public class WorkflowModuleApprovalGateTests
         (await service.ShouldTriggerWorkflow(NewEntity(), "CREATE", Module)).Should().BeTrue();
     }
 
-    [Fact]
-    public async Task ShouldTriggerWorkflow_ModuleUnknown_NothingBound_ReturnsFalse()
+    [Theory]
+    [InlineData(ModuleAccess.Unknown)]
+    [InlineData(ModuleAccess.Enabled)]
+    public async Task ShouldTriggerWorkflow_NothingBound_MarkerPresent_ReturnsFalse(ModuleAccess access)
     {
-        var service = WorkflowServiceFor(ModuleAccess.Unknown, WorkflowConfigLookup.Absent, Definitions(WorkflowDefinitionLookupStatus.Absent));
+        var service = WorkflowServiceFor(access, WorkflowConfigLookup.Absent, Definitions(WorkflowDefinitionLookupStatus.Absent));
 
         (await service.ShouldTriggerWorkflow(NewEntity(), "CREATE", Module)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Unknown, "CREATE")]
+    [InlineData(ModuleAccess.Enabled, "CREATE")]
+    [InlineData(ModuleAccess.Enabled, "UPDATE")]
+    public async Task ShouldTriggerWorkflow_NothingBound_MarkerMissing_Throws(ModuleAccess access, string operation)
+    {
+        var service = WorkflowServiceFor(access, WorkflowConfigLookup.Absent, Definitions(WorkflowDefinitionLookupStatus.Absent),
+            WorkflowCacheWarmStatus.NotWarm);
+
+        var act = () => service.ShouldTriggerWorkflow(NewEntity(), operation, Module);
+
+        await act.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+    }
+
+    [Fact]
+    public async Task ShouldTriggerWorkflow_PresetCodeUnpublished_DoesNotUseEntityTypeDefinition()
+    {
+        var service = WorkflowServiceFor(ModuleAccess.Enabled, WorkflowConfigLookup.Absent,
+            new FixedDefinitionProvider(WorkflowDefinitionLookup.Absent, WorkflowDefinitionLookup.Found(Published())));
+        var entity = NewEntity();
+        entity.WorkflowCode = "X-WF";
+
+        (await service.ShouldTriggerWorkflow(entity, "CREATE", Module)).Should().BeFalse();
     }
 
     [Theory]
@@ -271,7 +417,8 @@ public class WorkflowModuleApprovalGateTests
 
         var act = () => service.ShouldTriggerWorkflow(entity, "CREATE", Module);
 
-        await act.Should().ThrowAsync<Exception>();
+        (await act.Should().ThrowAsync<TargetInvocationException>())
+            .WithInnerException<InvalidOperationException>();
     }
 
     [Fact]
@@ -283,7 +430,7 @@ public class WorkflowModuleApprovalGateTests
         var act = () => service.ShouldTriggerWorkflow(NewEntity(), "CREATE", Module);
 
         await act.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
-        metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.ConfigSource, Module, "TestWorkflowEntity", "CREATE"));
+        metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.ConfigSource, Module, nameof(TestWorkflowEntity), "CREATE"));
     }
 
     [Theory]
@@ -364,16 +511,19 @@ public class WorkflowModuleApprovalGateTests
         IWorkflowDefinitionProvider? definitions = null) =>
         new(new ScriptedModuleAccessService(access), config, NullLogger<WorkflowModuleApprovalGate>.Instance, definitions);
 
-    private static IWorkflowDefinitionProvider Definitions(WorkflowDefinitionLookupStatus status) =>
-        new FixedDefinitionProvider(status switch
+    private static IWorkflowDefinitionProvider Definitions(WorkflowDefinitionLookupStatus status)
+    {
+        var lookup = status switch
         {
-            WorkflowDefinitionLookupStatus.Found => WorkflowDefinitionLookup.Found(new PublishedWorkflowDefinition
-            {
-                TenantId = TenantId, WorkflowCode = "WF", EntityType = EntityType, IsActive = true
-            }),
+            WorkflowDefinitionLookupStatus.Found => WorkflowDefinitionLookup.Found(Published()),
             WorkflowDefinitionLookupStatus.Absent => WorkflowDefinitionLookup.Absent,
             _ => WorkflowDefinitionLookup.Unknown
-        });
+        };
+        return new FixedDefinitionProvider(lookup, lookup);
+    }
+
+    private static PublishedWorkflowDefinition Published(bool active = true) =>
+        new() { TenantId = TenantId, WorkflowCode = "WF", EntityType = EntityType, IsActive = active };
 
     private static WorkflowModuleApprovalGate RealGate(InMemoryGlobalRedis redis)
     {
@@ -394,9 +544,10 @@ public class WorkflowModuleApprovalGateTests
     private static WorkflowService WorkflowServiceFor(
         ModuleAccess access,
         WorkflowConfigLookup lookup,
-        IWorkflowDefinitionProvider? definitions = null) =>
+        IWorkflowDefinitionProvider? definitions = null,
+        WorkflowCacheWarmStatus warm = WorkflowCacheWarmStatus.Warm) =>
         new(
-            new FakeLookupConfigCache(lookup),
+            new FakeLookupConfigCache(lookup, warm),
             new ScriptedModuleAccessService(access),
             new TenantContext(),
             Microsoft.Extensions.Options.Options.Create(new SystemOptions()),
@@ -409,23 +560,24 @@ public class WorkflowModuleApprovalGateTests
         public string Broken => throw new InvalidOperationException("broken property");
     }
 
-    private sealed class FixedDefinitionProvider(WorkflowDefinitionLookup lookup) : IWorkflowDefinitionProvider
+    private sealed class FixedDefinitionProvider(WorkflowDefinitionLookup byCode, WorkflowDefinitionLookup byEntity)
+        : IWorkflowDefinitionProvider
     {
         public Task<PublishedWorkflowDefinition?> GetPublishedDefinitionAsync(
             string tenantId, string workflowCode, string entityType, CancellationToken cancellationToken = default) =>
-            Task.FromResult(lookup.Definition);
+            Task.FromResult(byCode.Definition);
 
         public Task<PublishedWorkflowDefinition?> GetPublishedDefinitionByEntityTypeAsync(
             string tenantId, string entityType, CancellationToken cancellationToken = default) =>
-            Task.FromResult(lookup.Definition);
+            Task.FromResult(byEntity.Definition);
 
         public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionAsync(
             string tenantId, string workflowCode, string entityType, CancellationToken cancellationToken = default) =>
-            Task.FromResult(lookup);
+            Task.FromResult(byCode);
 
         public Task<WorkflowDefinitionLookup> LookupPublishedDefinitionByEntityTypeAsync(
             string tenantId, string entityType, CancellationToken cancellationToken = default) =>
-            Task.FromResult(lookup);
+            Task.FromResult(byEntity);
     }
 
     private static TestWorkflowEntity NewEntity()
@@ -436,9 +588,13 @@ public class WorkflowModuleApprovalGateTests
         return entity;
     }
 
-    private sealed class FakeLookupConfigCache(WorkflowConfigLookup lookup) : IWorkflowConfigCacheService
+    private sealed class FakeLookupConfigCache(
+        WorkflowConfigLookup lookup,
+        WorkflowCacheWarmStatus warm = WorkflowCacheWarmStatus.Warm) : IWorkflowConfigCacheService
     {
         public int LookupCount { get; private set; }
+
+        public Task<WorkflowCacheWarmStatus> GetTenantWarmStatusAsync(string? tenantId = null) => Task.FromResult(warm);
 
         public Task<WorkflowConfigLookup> LookupEntityConfigAsync(string module, string entityType, string? tenantId = null)
         {

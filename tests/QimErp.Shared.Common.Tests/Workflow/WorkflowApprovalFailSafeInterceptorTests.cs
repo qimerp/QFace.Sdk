@@ -35,7 +35,7 @@ public class WorkflowApprovalFailSafeInterceptorTests
     }
 
     [Fact]
-    public async Task ModuleUnknown_NoConfig_NoDefinition_SavesWithoutApproval()
+    public async Task ModuleUnknown_NoConfig_NoDefinition_MarkerPresent_SavesWithoutApproval()
     {
         await using var harness = Harness(ModuleAccess.Unknown);
 
@@ -108,10 +108,12 @@ public class WorkflowApprovalFailSafeInterceptorTests
         (await harness.Context.Entities.CountAsync()).Should().Be(1);
     }
 
-    [Fact]
-    public async Task ModuleEnabled_UpdateWithConfigMissing_NoDefinition_SavesWithoutApproval()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ModuleEnabled_UpdateWithConfigMissing_NoDefinition_MarkerPresent_SavesWithoutApproval(bool gate)
     {
-        await using var harness = Harness(ModuleAccess.Enabled);
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
         var entity = await SeedApprovedAsync(harness);
 
         entity.Amount = 9000;
@@ -119,6 +121,121 @@ public class WorkflowApprovalFailSafeInterceptorTests
 
         entity.WorkflowStatus.Should().Be(WorkflowStatus.Approved);
         (await ApprovalRowCountAsync(harness)).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public async Task ModuleEnabled_UpdateOrDeleteWithConfigMissing_NoDefinition_MarkerMissing_RefusesSave(bool gate, bool delete)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        var entity = await SeedApprovedAsync(harness);
+        harness.ConfigCache.WarmStatus = WorkflowCacheWarmStatus.NotWarm;
+
+        if (delete)
+            harness.Context.Remove(entity);
+        else
+            entity.Amount = 9000;
+        var save = () => harness.Context.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+        harness.Context.ChangeTracker.Clear();
+        (await harness.Context.Entities.SingleAsync()).Amount.Should().Be(100);
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Unknown, true, WorkflowCacheWarmStatus.NotWarm)]
+    [InlineData(ModuleAccess.Unknown, true, WorkflowCacheWarmStatus.Unknown)]
+    [InlineData(ModuleAccess.Enabled, true, WorkflowCacheWarmStatus.NotWarm)]
+    [InlineData(ModuleAccess.Enabled, false, WorkflowCacheWarmStatus.NotWarm)]
+    public async Task CreateNothingBound_MarkerMissingOrUnreadable_RefusesSave(ModuleAccess access, bool gate, WorkflowCacheWarmStatus warm)
+    {
+        await using var harness = Harness(access, gate);
+        harness.ConfigCache.WarmStatus = warm;
+
+        harness.Context.Add(NewEntity());
+        var save = () => harness.Context.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+        (await harness.Context.Entities.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CreateWithPresetCodeUnpublished_EntityTypeDefinitionActive_DoesNotStartIt(bool gate)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        harness.DefinitionProvider.SetByEntityDefinition("Y-WF", ActiveDefinition());
+
+        var entity = NewEntity();
+        entity.WorkflowCode = "X-WF";
+        harness.Context.Add(entity);
+        await harness.Context.SaveChangesAsync();
+
+        entity.WorkflowStatus.Should().NotBe(WorkflowStatus.InProgress);
+        entity.DataStatus.Should().Be(DataState.Active);
+        (await ApprovalRowCountAsync(harness)).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CreateWithPresetCodeUnpublished_MarkerMissing_RefusesSave(bool gate)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        harness.DefinitionProvider.SetByEntityDefinition("Y-WF", ActiveDefinition());
+        harness.ConfigCache.WarmStatus = WorkflowCacheWarmStatus.NotWarm;
+
+        var entity = NewEntity();
+        entity.WorkflowCode = "X-WF";
+        harness.Context.Add(entity);
+        var save = () => harness.Context.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ModuleEnabled_WorkflowModuleNotConfigured_RefusesSave(bool gate)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate, module: "");
+
+        harness.Context.Add(NewEntity());
+        var save = () => harness.Context.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+        (await harness.Context.Entities.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Enabled, true)]
+    [InlineData(ModuleAccess.Unknown, true)]
+    [InlineData(ModuleAccess.NotInstalled, false)]
+    public async Task HandOff_DefinitionUnreadable_RefusesUnlessWorkflowKnownAbsent(ModuleAccess access, bool refused)
+    {
+        await using var harness = Harness(access);
+        harness.ConfigCache.SetConfig(ModuleName, new EntityWorkflowConfig());
+        harness.DefinitionProvider.Unreadable = true;
+
+        var entity = NewEntity();
+        entity.InitiateWorkflow("tester@qimerp.com", "emp-1", "Tester", "submitted by domain code");
+        harness.Context.Add(entity);
+        var save = () => harness.Context.SaveChangesAsync();
+
+        if (refused)
+        {
+            await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>();
+            (await harness.Context.Entities.CountAsync()).Should().Be(0);
+        }
+        else
+        {
+            await save();
+            (await ApprovalRowCountAsync(harness)).Should().Be(0);
+        }
     }
 
     [Fact]
@@ -259,8 +376,8 @@ public class WorkflowApprovalFailSafeInterceptorTests
         reloaded.WorkflowCode.Should().Be("UPDATE-WF");
     }
 
-    private static InterceptorE2EHarness Harness(ModuleAccess access) =>
-        new(TenantId, ModuleName, new ScriptedModuleAccessService(access), registerApprovalGate: true);
+    private static InterceptorE2EHarness Harness(ModuleAccess access, bool gate = true, string module = ModuleName) =>
+        new(TenantId, module, new ScriptedModuleAccessService(access), registerApprovalGate: gate);
 
     private static async Task<TestWorkflowEntity> SeedApprovedAsync(InterceptorE2EHarness harness)
     {
