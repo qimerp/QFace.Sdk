@@ -37,7 +37,6 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
     // ≥ fan-out of concurrent InMemory GenerateAsync callers (product create test uses 10).
     private const int NonRelationalConcurrencyAttempts = 12;
 
-    // A concurrent first load can insert the same configs; the losing save re-reads and retries.
     private const int BulkCreateAttempts = 3;
 
     private static string EffectiveCompanyId => CompanyContext.CurrentScope.EffectiveCompanyId;
@@ -514,7 +513,7 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
 
         for (var attempt = 1; ; attempt++)
         {
-            // IgnoreQueryFilters: explicit tenant scope; company rows and tenant-wide seed rows in one round trip.
+            // IgnoreQueryFilters: explicit tenant scope.
             var rows = await _context.Set<EntityCodeConfig>()
                 .IgnoreQueryFilters()
                 .AsNoTracking()
@@ -558,7 +557,7 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
             {
                 await SaveNewConfigsAsync(created, companyId, ct);
             }
-            catch (DbUpdateException) when (attempt < BulkCreateAttempts)
+            catch (DbUpdateException) when (attempt < BulkCreateAttempts && _context.Database.CurrentTransaction is null)
             {
                 foreach (var config in created)
                     _context.Entry(config).State = EntityState.Detached;
