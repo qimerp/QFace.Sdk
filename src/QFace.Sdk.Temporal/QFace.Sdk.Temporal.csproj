@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <PackageId>QFace.Sdk.Temporal</PackageId>
-    <Version>1.0.10</Version>
+    <Version>1.0.13-people.1</Version>
     <Authors>IAmQwame</Authors>
     <Company>QFace</Company>
     <Description>
@@ -40,6 +40,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="QimErp.Shared.Common.Tests" />
   </ItemGroup>
 
 </Project>

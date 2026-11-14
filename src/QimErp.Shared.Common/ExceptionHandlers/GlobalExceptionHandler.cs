@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using QimErp.Shared.Common.Logging;
 
 namespace QimErp.Shared.Common.ExceptionHandlers;
 
@@ -30,12 +31,16 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
     {
         var endpoint = httpContext.GetEndpoint()?.DisplayName ?? httpContext.Request.Path.Value ?? "(unknown)";
         var tenantId = httpContext.User.FindFirst("tenant_id")?.Value;
+        var anonymous = AnonymousRequests.IsAnonymous(httpContext);
 
         if (exception is ValidationException validationException)
         {
-            logger.LogWarning(
-                "Validation failure in {Endpoint} (TenantId={TenantId}): {Errors}",
-                endpoint, tenantId, validationException.Message);
+            if (anonymous)
+                logger.LogWarning("Validation failure in {Endpoint} (TenantId={TenantId})", endpoint, tenantId);
+            else
+                logger.LogWarning(
+                    "Validation failure in {Endpoint} (TenantId={TenantId}): {Errors}",
+                    endpoint, tenantId, validationException.Message);
 
             httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
             await httpContext.Response.WriteAsJsonAsync(new ValidationProblemDetails(
@@ -52,7 +57,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         }
 
         logger.LogError(
-            exception,
+            anonymous ? AnonymousRequests.TypeOnly(exception) : exception,
             "Unhandled exception in {Endpoint} (TenantId={TenantId})",
             endpoint, tenantId);
 

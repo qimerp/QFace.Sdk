@@ -12,7 +12,14 @@ public sealed class UserLoggingScopeMiddleware(RequestDelegate next, ILoggerFact
 
     public Task InvokeAsync(HttpContext context, ICurrentUserService currentUserService)
     {
-        using (_logger.BeginUserContextScope(currentUserService))
+        var anonymousRequest = AnonymousRequests.ContextOf(context);
+        if (AnonymousRequests.IsAnonymousEndpoint(context))
+        {
+            anonymousRequest ??= new AnonymousRequestContext();
+            anonymousRequest.MarkAnonymous();
+        }
+
+        using (_logger.BeginUserContextScope(currentUserService, anonymousRequest))
             return _next(context);
     }
 }

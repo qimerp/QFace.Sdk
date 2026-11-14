@@ -1,3 +1,5 @@
+using QimErp.Shared.Common.Logging;
+
 namespace QimErp.Shared.Common.Middlewares;
 
 public class RequestLoggingOptions
@@ -52,8 +54,8 @@ public class RequestLoggingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing request {Method} {Path}", 
-                context.Request.Method, context.Request.Path);
+            _logger.LogError(AnonymousRequests.IsAnonymous(context) ? AnonymousRequests.TypeOnly(ex) : ex,
+                "Error processing request {Method} {Path}", context.Request.Method, context.Request.Path);
             throw;
         }
     }
@@ -67,6 +69,12 @@ public class RequestLoggingMiddleware
     private async Task LogRequestAsync(HttpContext context)
     {
         var request = context.Request;
+        if (AnonymousRequests.IsAnonymousEndpoint(context))
+        {
+            _logger.Log(_options.LogLevel, "HTTP request {Method} {Path}", request.Method, request.Path.Value ?? "");
+            return;
+        }
+
         var pathAndQuery = request.Path.Value ?? "";
         if (_options.LogQueryString && request.Query.Count > 0)
             pathAndQuery += "?" + string.Join("&", request.Query.Select(q =>
