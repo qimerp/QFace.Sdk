@@ -243,10 +243,42 @@ public class WorkflowApprovalFailSafeInterceptorTests
         harness.Context.Add(entity);
         var save = () => harness.Context.SaveChangesAsync();
 
-        (await save.Should().ThrowAsync<WorkflowApprovalStateUnavailableException>()).Which.Operation.Should().Be("CREATE");
+        (await save.Should().ThrowAsync<WorkflowPresetCodeMismatchException>()).Which.EntityType.Should().Be(nameof(TestWorkflowEntity));
         (await harness.Context.Entities.CountAsync()).Should().Be(0);
         (await harness.Context.OutboxMessages.CountAsync()).Should().Be(0);
         metrics.Unreadable.Should().Contain(m => m.Source == WorkflowApprovalGateMetrics.PresetCodeMismatch && m.EntityType == nameof(TestWorkflowEntity));
+    }
+
+    [Theory]
+    [InlineData(true, 100, false)]
+    [InlineData(false, 100, false)]
+    [InlineData(true, 5000, true)]
+    [InlineData(false, 5000, true)]
+    public async Task PresetCodeDiffers_RefusedOnlyAboveTheConfiguredTriggerThreshold(bool gate, decimal amount, bool refused)
+    {
+        await using var harness = Harness(ModuleAccess.Enabled, gate);
+        harness.ConfigCache.SetConfig(ModuleName, WorkflowModuleApprovalGateTests.ThresholdConfig());
+        harness.DefinitionProvider.SetDefinition("CREATE-WF", ActiveDefinition());
+        harness.DefinitionProvider.SetDefinition("OLD-WF", Definition(active: false));
+
+        var entity = NewEntity();
+        entity.Amount = amount;
+        entity.WorkflowCode = "OLD-WF";
+        harness.Context.Add(entity);
+        var save = () => harness.Context.SaveChangesAsync();
+
+        if (refused)
+        {
+            await save.Should().ThrowAsync<WorkflowPresetCodeMismatchException>();
+            (await harness.Context.Entities.CountAsync()).Should().Be(0);
+        }
+        else
+        {
+            await save();
+            entity.WorkflowStatus.Should().NotBe(WorkflowStatus.InProgress);
+            (await ApprovalRowCountAsync(harness)).Should().Be(0);
+            (await harness.Context.Entities.CountAsync()).Should().Be(1);
+        }
     }
 
     [Theory]

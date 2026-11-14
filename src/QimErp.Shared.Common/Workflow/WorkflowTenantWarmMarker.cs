@@ -26,10 +26,11 @@ public sealed class WorkflowTenantWarmMarker
 
     public static string BoundPair(string module, string entityType) => $"{module}:{entityType}";
 
-    public bool IsBoundSetPresent => Version == CurrentVersion && Bound is not null;
+    /// <summary>A Bound set with a null entry is malformed and proves nothing.</summary>
+    public bool IsBoundSetPresent => Version == CurrentVersion && Bound is not null && !Bound.Any(pair => pair is null);
 
     public bool IsBound(string module, string entityType) =>
-        Bound?.Any(pair => string.Equals(BoundEntityType(pair), entityType, StringComparison.OrdinalIgnoreCase)) == true;
-
-    private static string BoundEntityType(string pair) => pair[(pair.LastIndexOf(':') + 1)..];
+        Bound?.Any(pair => !string.IsNullOrEmpty(pair)
+            && (pair.EndsWith(":" + entityType, StringComparison.OrdinalIgnoreCase)
+                || pair.Equals(entityType, StringComparison.OrdinalIgnoreCase))) == true;
 }

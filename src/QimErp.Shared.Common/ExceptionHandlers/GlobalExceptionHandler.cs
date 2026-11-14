@@ -59,6 +59,24 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             return true;
         }
 
+        if (exception is WorkflowPresetCodeMismatchException presetMismatch)
+        {
+            logger.LogWarning(
+                "Preset workflow code rejected in {Endpoint} (TenantId={TenantId}, Module={Module}, EntityType={EntityType})",
+                endpoint, presetMismatch.TenantId, presetMismatch.Module, presetMismatch.EntityType);
+
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
+            {
+                Title = "Approval workflow does not match",
+                Detail = presetMismatch.Message,
+                Status = StatusCodes.Status409Conflict,
+                Instance = httpContext.Request.Path,
+            }, cancellationToken);
+
+            return true;
+        }
+
         if (exception is WorkflowApprovalStateUnavailableException approvalUnavailable)
         {
             logger.LogWarning(

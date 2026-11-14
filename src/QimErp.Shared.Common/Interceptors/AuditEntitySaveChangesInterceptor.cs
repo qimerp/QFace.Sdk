@@ -1159,6 +1159,7 @@ public class AuditEntitySaveChangesInterceptor(
                     entity.EntityType,
                     operation,
                     operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null,
+                    entity,
                     cancellationToken);
 
             if (approvalState == WorkflowApprovalGateState.Unavailable)
@@ -1181,92 +1182,76 @@ public class AuditEntitySaveChangesInterceptor(
             var workflowInitiatedForCreate = false;
             EntityWorkflowConfig? entityWorkflowConfig = null;
 
-            // Only CREATE may trust a WorkflowCode already present on the entity. For
-            // UPDATE/DELETE the stored code is residue from the workflow that created the
-            // row — trusting it bypasses the tenant config gate (EnableWorkflowForUpdate /
-            // routes) and re-initiates the create workflow on every later save of an
-            // approved entity, flipping it back to InProgress.
+            // UPDATE/DELETE ignore the stored WorkflowCode; it belongs to the create workflow.
             var presetCode = operation == "CREATE" ? GetWorkflowCodeFromEntity(entity) : null;
             string? workflowCode = presetCode;
             var skipWorkflowInitiation = false;
             var configMissing = false;
 
+            if (string.IsNullOrWhiteSpace(gateModule))
+                throw ModuleNotConfigured(tenantId, entity.EntityType, operation);
+
+            var configLookup = await configCacheService.LookupEntityConfigAsync(gateModule, entity.EntityType, tenantId);
+            if (configLookup.Status == WorkflowConfigLookupStatus.Unknown)
             {
-                var module = GetModuleFor(entity);
-                if (string.IsNullOrWhiteSpace(module))
+                WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                    WorkflowApprovalGateMetrics.ConfigSource, gateModule, entity.EntityType, operation);
+                throw new WorkflowApprovalStateUnavailableException(tenantId, gateModule, entity.EntityType, operation);
+            }
+
+            configMissing = configLookup.Status == WorkflowConfigLookupStatus.Absent;
+            var config = configLookup.Config;
+            if (!string.IsNullOrWhiteSpace(presetCode)
+                && WorkflowInterceptDecisions.ConfigRequiresCreateApproval(config, entity)
+                && !string.Equals(presetCode, config.CreateWorkflowCode, StringComparison.OrdinalIgnoreCase))
+            {
+                throw PresetCodeMismatch(tenantId, gateModule, entity.EntityType, presetCode, config.CreateWorkflowCode!);
+            }
+
+            entityWorkflowConfig = config;
+            if (config != null && (string.IsNullOrWhiteSpace(presetCode) || IsCreateWorkflowRequired(config)))
+            {
+                var changedFields = WorkflowFieldChangeDetector.DetectChangedFields(entry);
+
+                if (IsUserExcluded(config, currentUser, userRoles))
+                    continue;
+
+                if (entry.State == EntityState.Modified)
                 {
-                    throw ModuleNotConfigured(tenantId, entity.EntityType, operation);
+                    var canEdit = await ValidateCanEditAsync(entity, config);
+                    if (!canEdit.IsSuccess)
+                    {
+                        throw new InvalidOperationException(canEdit.Error!.Message);
+                    }
                 }
-                else
+
+                if (entry.State == EntityState.Deleted)
                 {
-                    var configLookup = await configCacheService.LookupEntityConfigAsync(module, entity.EntityType, tenantId);
-                    if (configLookup.Status == WorkflowConfigLookupStatus.Unknown)
+                    var canDelete = await ValidateCanDeleteAsync(entity, config);
+                    if (!canDelete.IsSuccess)
                     {
-                        WorkflowApprovalGateMetrics.RecordStateUnreadable(
-                            WorkflowApprovalGateMetrics.ConfigSource, module, entity.EntityType, operation);
-                        throw new WorkflowApprovalStateUnavailableException(tenantId, module, entity.EntityType, operation);
+                        throw new InvalidOperationException(canDelete.Error!.Message);
                     }
+                }
 
-                    configMissing = configLookup.Status == WorkflowConfigLookupStatus.Absent;
-                    var config = configLookup.Config;
-                    if (!string.IsNullOrWhiteSpace(presetCode)
-                        && IsCreateWorkflowRequired(config)
-                        && !string.Equals(presetCode, config!.CreateWorkflowCode, StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw PresetCodeMismatch(tenantId, module, entity.EntityType, presetCode, config.CreateWorkflowCode!);
-                    }
+                workflowCode = operation.ToUpperInvariant() switch
+                {
+                    "CREATE" when WorkflowInterceptDecisions.ShouldStartCreateWorkflow(config, entity)
+                        => config.CreateWorkflowCode,
+                    "UPDATE" when config.EnableWorkflowForUpdate
+                        => WorkflowRouteResolver.ResolveUpdateRoute(config, changedFields, entity)?.WorkflowCode,
+                    "DELETE" when config.EnableWorkflowForDelete
+                        => WorkflowRouteResolver.ResolveDeleteRoute(config, changedFields, entity)?.WorkflowCode,
+                    _ => null
+                };
 
-                    entityWorkflowConfig = config;
-                    if (config != null && (string.IsNullOrWhiteSpace(presetCode) || IsCreateWorkflowRequired(config)))
-                    {
-                        var changedFields = WorkflowFieldChangeDetector.DetectChangedFields(entry);
-
-                        if (IsUserExcluded(config, currentUser, userRoles))
-                            continue;
-
-                        if (entry.State == EntityState.Modified)
-                        {
-                            var canEdit = await ValidateCanEditAsync(entity, config);
-                            if (!canEdit.IsSuccess)
-                            {
-                                throw new InvalidOperationException(canEdit.Error!.Message);
-                            }
-                        }
-
-                        if (entry.State == EntityState.Deleted)
-                        {
-                            var canDelete = await ValidateCanDeleteAsync(entity, config);
-                            if (!canDelete.IsSuccess)
-                            {
-                                throw new InvalidOperationException(canDelete.Error!.Message);
-                            }
-                        }
-
-                        workflowCode = operation.ToUpperInvariant() switch
-                        {
-                            "CREATE" when WorkflowInterceptDecisions.ShouldStartCreateWorkflow(config, entity)
-                                => config.CreateWorkflowCode,
-                            "UPDATE" when config.EnableWorkflowForUpdate
-                                => WorkflowRouteResolver.ResolveUpdateRoute(config, changedFields, entity)?.WorkflowCode,
-                            "DELETE" when config.EnableWorkflowForDelete
-                                => WorkflowRouteResolver.ResolveDeleteRoute(config, changedFields, entity)?.WorkflowCode,
-                            _ => null
-                        };
-
-                        // A tenant config is authoritative for every operation. When it yields no
-                        // workflow code (gate disabled, no route, trigger conditions unmet) the save
-                        // proceeds directly — the published-definition fallback below is only for
-                        // entities that have no configuration row at all. Without this, CREATE fell
-                        // through to GetPublishedDefinitionByEntityTypeAsync and started workflows
-                        // for tenants that had explicitly disabled them.
-                        if (string.IsNullOrWhiteSpace(workflowCode))
-                        {
-                            logger.LogDebug(
-                                "No matching {Operation} workflow route for {EntityType}. Changed fields: {ChangedFields}",
-                                operation, entity.EntityType, string.Join(", ", changedFields));
-                            skipWorkflowInitiation = true;
-                        }
-                    }
+                // A config that yields no workflow code is authoritative: never fall back to a published definition.
+                if (string.IsNullOrWhiteSpace(workflowCode))
+                {
+                    logger.LogDebug(
+                        "No matching {Operation} workflow route for {EntityType}. Changed fields: {ChangedFields}",
+                        operation, entity.EntityType, string.Join(", ", changedFields));
+                    skipWorkflowInitiation = true;
                 }
             }
 
@@ -1508,7 +1493,7 @@ public class AuditEntitySaveChangesInterceptor(
         }
     }
 
-    private WorkflowApprovalStateUnavailableException PresetCodeMismatch(
+    private WorkflowPresetCodeMismatchException PresetCodeMismatch(
         string tenantId, string module, string entityType, string presetCode, string configuredCode)
     {
         logger.LogError(
@@ -1516,7 +1501,7 @@ public class AuditEntitySaveChangesInterceptor(
             entityType, presetCode, tenantId, configuredCode);
         WorkflowApprovalGateMetrics.RecordStateUnreadable(
             WorkflowApprovalGateMetrics.PresetCodeMismatch, module, entityType, "CREATE");
-        return new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, "CREATE");
+        return new WorkflowPresetCodeMismatchException(tenantId, module, entityType, presetCode, configuredCode);
     }
 
     private WorkflowApprovalStateUnavailableException ModuleNotConfigured(string tenantId, string entityType, string operation)

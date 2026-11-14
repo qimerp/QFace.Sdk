@@ -3,9 +3,10 @@
 set -euo pipefail
 
 sdk_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-version="0.0.0-guardcheck.$(date +%s)"
+version="0.0.0-guardcheck.$(date +%s).$$"
 work=$(mktemp -d)
 packages_root="${NUGET_PACKAGES:-$HOME/.nuget/packages}"
+build_flags=(-m:1 -nodeReuse:false -p:UseSharedCompilation=false)
 
 cleanup() {
   rm -rf "$work" \
@@ -43,7 +44,7 @@ fi
 echo "Packing $version..."
 for project in QimErp.Shared.Common QimErp.Shared.Common.Testing; do
   dotnet pack "$sdk_root/src/$project/$project.csproj" -c Release -o "$work/feed" \
-    -p:QimErpSharedCommonVersion="$version" -nologo -v q >"$work/pack-$project.log" 2>&1 \
+    -p:QimErpSharedCommonVersion="$version" "${build_flags[@]}" -nologo -v q >"$work/pack-$project.log" 2>&1 \
     || { cat "$work/pack-$project.log" >&2; fail "dotnet pack $project"; }
 done
 
@@ -91,12 +92,12 @@ EOF
 make_consumer production ""
 make_consumer tests "<IsTestProject>true</IsTestProject>"
 
-if dotnet build "$work/production/production.csproj" -nologo >"$work/production.log" 2>&1; then
+if dotnet build "$work/production/production.csproj" "${build_flags[@]}" -nologo >"$work/production.log" 2>&1; then
   fail "a non-test consumer built without QIMTEST001"
 fi
 grep -q "QIMTEST001" "$work/production.log" || { cat "$work/production.log" >&2; fail "non-test build failed for another reason"; }
 echo "ok    non-test consumer fails with QIMTEST001"
 
-dotnet build "$work/tests/tests.csproj" -nologo >"$work/tests.log" 2>&1 \
+dotnet build "$work/tests/tests.csproj" "${build_flags[@]}" -nologo >"$work/tests.log" 2>&1 \
   || { cat "$work/tests.log" >&2; fail "test consumer did not build"; }
 echo "ok    test consumer builds"

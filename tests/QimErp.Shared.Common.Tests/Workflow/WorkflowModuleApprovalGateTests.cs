@@ -510,19 +510,111 @@ public class WorkflowModuleApprovalGateTests
     }
 
     [Theory]
-    [InlineData("OLD-WF", true, WorkflowApprovalGateState.Unavailable)]
-    [InlineData("create-wf", true, WorkflowApprovalGateState.On)]
-    [InlineData("OLD-WF", false, WorkflowApprovalGateState.On)]
-    public async Task ConfigFound_PresetCodeMustMatchConfiguredCreateWorkflow(
-        string presetCode, bool createEnabled, WorkflowApprovalGateState expected)
+    [InlineData("create-wf", true)]
+    [InlineData("OLD-WF", false)]
+    public async Task ConfigFound_PresetCodeCompatibleWithConfig_IsOn(string presetCode, bool createEnabled)
     {
         var gate = Gate(ModuleAccess.Enabled, new FakeLookupConfigCache(WorkflowConfigLookup.Found(
             new EntityWorkflowConfig { EnableWorkflowForCreate = createEnabled, CreateWorkflowCode = "CREATE-WF" })));
+
+        (await gate.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE", presetCode)).Should().Be(WorkflowApprovalGateState.On);
+    }
+
+    [Theory]
+    [InlineData(ModuleAccess.Enabled)]
+    [InlineData(ModuleAccess.Unknown)]
+    public async Task ConfigFound_PresetCodeDiffersFromConfiguredCreateWorkflow_ThrowsMismatch(ModuleAccess access)
+    {
+        var gate = Gate(access, new FakeLookupConfigCache(WorkflowConfigLookup.Found(
+            new EntityWorkflowConfig { EnableWorkflowForCreate = true, CreateWorkflowCode = "CREATE-WF" })));
         using var metrics = new GateMetricRecorder();
 
-        (await gate.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE", presetCode)).Should().Be(expected);
-        if (expected == WorkflowApprovalGateState.Unavailable)
-            metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.PresetCodeMismatch, Module, EntityType, "CREATE"));
+        var act = () => gate.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE", "OLD-WF");
+
+        var thrown = await act.Should().ThrowAsync<WorkflowPresetCodeMismatchException>();
+        thrown.Which.EntityType.Should().Be(EntityType);
+        thrown.Which.Message.Should().Contain(EntityType).And.NotContain(TenantId).And.NotContain("OLD-WF");
+        metrics.Unreadable.Should().Contain((WorkflowApprovalGateMetrics.PresetCodeMismatch, Module, EntityType, "CREATE"));
+    }
+
+    [Theory]
+    [InlineData(100, false)]
+    [InlineData(5000, true)]
+    public async Task ConfigFound_PresetMismatch_RefusedOnlyWhenTriggerConditionsAreMet(decimal amount, bool refused)
+    {
+        var gate = Gate(ModuleAccess.Enabled, new FakeLookupConfigCache(WorkflowConfigLookup.Found(ThresholdConfig())));
+        var entity = NewEntity();
+        entity.Amount = amount;
+
+        var act = () => gate.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE", "OLD-WF", entity);
+
+        if (refused)
+            await act.Should().ThrowAsync<WorkflowPresetCodeMismatchException>();
+        else
+            (await act()).Should().Be(WorkflowApprovalGateState.On);
+    }
+
+    [Fact]
+    public async Task ConfigFound_PresetMismatch_WithoutEntity_TreatsConditionsAsMet()
+    {
+        var gate = Gate(ModuleAccess.Enabled, new FakeLookupConfigCache(WorkflowConfigLookup.Found(ThresholdConfig())));
+
+        var act = () => gate.GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE", "OLD-WF");
+
+        await act.Should().ThrowAsync<WorkflowPresetCodeMismatchException>();
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("  ", false)]
+    [InlineData("CREATE-WF", true)]
+    public void ConfigRequiresCreateApproval_NeedsAWorkflowCode(string? code, bool expected)
+    {
+        var config = new EntityWorkflowConfig { EnableWorkflowForCreate = true, CreateWorkflowCode = code };
+
+        WorkflowInterceptDecisions.ConfigRequiresCreateApproval(config, NewEntity()).Should().Be(expected);
+        WorkflowInterceptDecisions.ConfigRequiresCreateApproval(null, NewEntity()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ShouldTriggerWorkflow_PresetCodeDiffersFromConfig_ThrowsMismatch()
+    {
+        var service = WorkflowServiceFor(ModuleAccess.Enabled, WorkflowConfigLookup.Found(
+            new EntityWorkflowConfig { EnableWorkflowForCreate = true, CreateWorkflowCode = "CREATE-WF" }));
+        var entity = NewEntity();
+        entity.WorkflowCode = "OLD-WF";
+
+        var act = () => service.ShouldTriggerWorkflow(entity, "CREATE", Module);
+
+        await act.Should().ThrowAsync<WorkflowPresetCodeMismatchException>();
+    }
+
+    [Theory]
+    [InlineData("GL:Ledger:Entry", true)]
+    [InlineData("ledger:entry", true)]
+    [InlineData("GL:Entry", false)]
+    [InlineData("", false)]
+    public async Task WarmMarker_BoundEntriesMatchWholeEntityTypeIncludingColons(string entry, bool bound)
+    {
+        var redis = new InMemoryGlobalRedis();
+        await SeedMarkerAsync(redis, DateTimeOffset.UtcNow, bound: [entry]);
+
+        (await ConfigCache(redis).GetTenantWarmStatusAsync(Module, "Ledger:Entry", TenantId))
+            .Should().Be(bound ? WorkflowCacheWarmStatus.BoundAtWarm : WorkflowCacheWarmStatus.Warm);
+    }
+
+    [Fact]
+    public async Task WarmMarker_WithNullBoundEntry_IsNotWarm_AndRefusesWithoutThrowingNullReference()
+    {
+        var marker = Newtonsoft.Json.JsonConvert.DeserializeObject<WorkflowTenantWarmMarker>(
+            $$"""{ "warmedAt": "{{DateTimeOffset.UtcNow:O}}", "version": 2, "bound": ["HR:Leave", null] }""")!;
+        var redis = new InMemoryGlobalRedis();
+        await redis.SetAsync(WorkflowDefinitionCacheKeys.TenantWarmMarker(TenantId), marker);
+
+        marker.Bound.Should().Contain((string?)null);
+        (await ConfigCache(redis).GetTenantWarmStatusAsync(Module, EntityType, TenantId)).Should().Be(WorkflowCacheWarmStatus.NotWarm);
+        (await RealGate(redis).GetApprovalStateAsync(TenantId, Module, EntityType, "CREATE"))
+            .Should().Be(WorkflowApprovalGateState.Unavailable);
     }
 
     [Theory]
@@ -797,6 +889,21 @@ public class WorkflowModuleApprovalGateTests
             NullLogger<WorkflowModuleApprovalGate>.Instance,
             new WorkflowDefinitionProvider(shared, NullLogger<WorkflowDefinitionProvider>.Instance));
     }
+
+    internal static EntityWorkflowConfig ThresholdConfig() => new()
+    {
+        EnableWorkflowForCreate = true,
+        CreateWorkflowCode = "CREATE-WF",
+        CreateTriggerConditions =
+        [
+            new WorkflowTriggerCondition
+            {
+                Field = nameof(TestWorkflowEntity.Amount),
+                Operator = QimErp.Shared.Common.Workflow.Enums.WorkflowOperators.GreaterThan,
+                Value = "1000"
+            }
+        ]
+    };
 
     private static Task SeedMarkerAsync(InMemoryGlobalRedis redis, DateTimeOffset warmedAt, List<string> bound, int version = 2) =>
         redis.SetAsync(

@@ -48,9 +48,10 @@ public sealed class WorkflowModuleApprovalGate(
         string entityType,
         string operation,
         string? workflowCode = null,
+        IWorkflowEnabled? entity = null,
         CancellationToken cancellationToken = default) =>
         EvaluateAsync(
-            moduleAccess, configCache, definitions, logger, tenantId, module, entityType, workflowCode, operation, cancellationToken);
+            moduleAccess, configCache, definitions, logger, tenantId, module, entityType, workflowCode, operation, entity, cancellationToken);
 
     internal static async Task<WorkflowApprovalGateState> EvaluateAsync(
         ITenantModuleAccessService moduleAccess,
@@ -62,6 +63,7 @@ public sealed class WorkflowModuleApprovalGate(
         string entityType,
         string? workflowCode,
         string operation,
+        IWorkflowEnabled? entity,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(tenantId))
@@ -105,16 +107,16 @@ public sealed class WorkflowModuleApprovalGate(
         {
             if (operation == "CREATE"
                 && !string.IsNullOrWhiteSpace(workflowCode)
-                && lookup.Config is { EnableWorkflowForCreate: true, CreateWorkflowCode: { Length: > 0 } configuredCode }
-                && !string.Equals(workflowCode, configuredCode, StringComparison.OrdinalIgnoreCase))
+                && WorkflowInterceptDecisions.ConfigRequiresCreateApproval(lookup.Config, entity)
+                && !string.Equals(workflowCode, lookup.Config.CreateWorkflowCode, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogError(
                     "[WorkflowModuleApprovalGate] {EntityType} create carries WorkflowCode {PresetCode} but tenant {TenantId} requires {ConfiguredCode} — refusing the write",
-                    entityType, workflowCode, tenantId, configuredCode);
+                    entityType, workflowCode, tenantId, lookup.Config.CreateWorkflowCode);
                 WorkflowApprovalGateMetrics.RecordStateUnreadable(
                     WorkflowApprovalGateMetrics.PresetCodeMismatch, module, entityType, operation);
-                Warn(WorkflowApprovalGateState.Unavailable, WorkflowApprovalGateMetrics.PresetCodeMismatch);
-                return WorkflowApprovalGateState.Unavailable;
+                throw new WorkflowPresetCodeMismatchException(
+                    tenantId, module, entityType, workflowCode, lookup.Config.CreateWorkflowCode!);
             }
 
             Warn(WorkflowApprovalGateState.On, WorkflowApprovalGateMetrics.ConfigFound);

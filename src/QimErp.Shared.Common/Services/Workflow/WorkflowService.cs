@@ -36,7 +36,7 @@ public class WorkflowService(
 
         var presetCode = operation == "CREATE" ? entity.WorkflowCode : null;
         var gateState = await WorkflowModuleApprovalGate.EvaluateAsync(
-            moduleAccess, configCacheService, definitionProvider, logger, tenantId, module, entityType, presetCode, operation, CancellationToken.None);
+            moduleAccess, configCacheService, definitionProvider, logger, tenantId, module, entityType, presetCode, operation, entity, CancellationToken.None);
         if (gateState == WorkflowApprovalGateState.Unavailable)
             throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
         if (gateState == WorkflowApprovalGateState.Off)

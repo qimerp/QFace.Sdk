@@ -98,6 +98,19 @@ Platform must ship these, in this order, before any service bumps the package:
 Until the version 2 marker is written, saves of workflow-enabled entities with nothing bound
 return 503.
 
+Finance must also change before it adopts this version. It creates `BillApproval`
+(`ApBillApproval`), `PurchaseOrderApproval` (`ApPurchaseOrderApproval`), `InvoiceApproval`
+(`ArInvoiceApproval`), `CreditNoteApproval` (`ArCreditNoteApproval`) and
+`FixedAssetDocumentApproval` (`Fa*Approval`) with preset workflow codes that Platform does not
+publish, and its module keys (`AP`/`AR`/`GL`) differ from Platform's bindings. Before bumping,
+Finance must either stop presetting those codes or have Platform publish them, and align its
+module keys with Platform's.
+
+A 503 (`WorkflowApprovalStateUnavailableException`, with `Retry-After`) means the approval state
+could not be read and the request can be retried. A 409 (`WorkflowPresetCodeMismatchException`)
+is permanent: the record was submitted with a `WorkflowCode` other than its configured create
+workflow, so it must be fixed by the caller, not retried.
+
 ## Consumers: test suites
 
 There is no runtime switch to turn the marker rule off. Test projects use the
