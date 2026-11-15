@@ -253,6 +253,7 @@ public class AuditEntitySaveChangesInterceptor(
 
     private async Task RunPreSaveAsync(DbContext context, CancellationToken cancellationToken)
     {
+        StampOutboxOrigin(context);
         SetTenantIdOnEntities(context);
         SetCompanyIdOnEntities(context);
         GuardCrossCompanyWrites(context);
@@ -275,6 +276,18 @@ public class AuditEntitySaveChangesInterceptor(
         var leftovers = PersistCapturedEventsToOutbox(workflowEvents);
         _contextEvents.AddOrUpdate(context, leftovers);
         AddAuditMetadata(context);
+    }
+
+    private void StampOutboxOrigin(DbContext context)
+    {
+        var origin = serviceProvider.GetService<OutboxOrigin>();
+        if (origin is null) return;
+
+        foreach (var entry in context.ChangeTracker.Entries<OutboxMessage>())
+        {
+            if (entry.State == EntityState.Added && entry.Entity.Origin is null)
+                entry.Entity.Origin = origin.Value;
+        }
     }
 
     /// <summary>

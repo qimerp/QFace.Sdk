@@ -51,6 +51,22 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
             var attempts = msg.Attempts + 1;
             var delaySeconds = Math.Min(300, Math.Pow(2, attempts));
             var dead = attempts >= Math.Max(1, _options.MaxAttempts);
+
+            if (dead)
+            {
+                log.Error(
+                    ex,
+                    "outbox.dead Id={0} Type={1} Transport={2} Error={3}",
+                    msg.Id, msg.EventType, msg.Transport, ex.Message);
+            }
+            else
+            {
+                log.Warning(
+                    ex,
+                    "outbox.retry Id={0} Type={1} Attempts={2} Error={3}",
+                    msg.Id, msg.EventType, attempts, ex.Message);
+            }
+
             await store.ScheduleRetryAsync(
                 msg.Id,
                 attempts,
@@ -58,19 +74,6 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
                 DateTimeOffset.UtcNow.AddSeconds(delaySeconds),
                 dead,
                 CancellationToken.None);
-
-            if (dead)
-            {
-                log.Error(
-                    "outbox.dead Id={0} Type={1} Transport={2} Error={3}",
-                    msg.Id, msg.EventType, msg.Transport, ex.Message);
-            }
-            else
-            {
-                log.Warning(
-                    "outbox.retry Id={0} Type={1} Attempts={2} Error={3}",
-                    msg.Id, msg.EventType, attempts, ex.Message);
-            }
         }
     }
 }

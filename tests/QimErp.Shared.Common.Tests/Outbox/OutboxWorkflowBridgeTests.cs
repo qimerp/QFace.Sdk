@@ -50,7 +50,7 @@ public sealed class OutboxWorkflowBridgeTests
         private EfOutbox? _inner;
 
         public void Bind(DbContext db, ITransportRouting routing, TimeProvider clock) =>
-            _inner = new EfOutbox(db, routing, clock);
+            _inner = new EfOutbox(db, routing, clock, OutboxOrigin.Deployed);
 
         public void Add(IDomainEvent domainEvent, Guid entityId, long entityVersion = 0) =>
             Require().Add(domainEvent, entityId, entityVersion);

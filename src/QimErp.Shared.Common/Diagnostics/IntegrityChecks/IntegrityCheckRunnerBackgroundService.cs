@@ -85,6 +85,11 @@ public sealed class IntegrityCheckRunnerBackgroundService : BackgroundService
                     result.CheckName, result.Count, result.SampleIds);
             else
                 _logger.LogInformation("Integrity check {Check} found no issues", result.CheckName);
+
+            foreach (var (owner, count) in result.NotOwnedCounts ?? new Dictionary<string, long>())
+                _logger.LogInformation(
+                    "data_integrity_not_owned check={Check} owner={Owner} count={Count}",
+                    result.CheckName, owner, count);
         }
 
         return results;
