@@ -141,6 +141,8 @@ The following options can be configured either in `appsettings.json` or programm
 | MinimumLevel   | Minimum level of logs to capture                                | LogEventLevel.Information |
 | IncludeConsole | Whether to include console logging alongside Graylog            | true                      |
 | Using          | Logging provider to use (currently only "Graylog" is supported) | "Graylog"                 |
+| Overrides      | Per-category minimum levels; configuration adds or replaces keys | Microsoft.AspNetCore: Warning (Authentication, Authorization, Cors: Information); System.Net.Http.HttpClient, Polly: Warning |
+| HealthCheckPaths | Below-Warning events for these request paths and their child paths are dropped; configuration appends | /ready, /live, /alive, /health |
 
 ### Programmatic Configuration
 
