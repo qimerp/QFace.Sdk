@@ -100,7 +100,7 @@ public sealed class PeopleEmailIntentContractTests
             .Select(t => (string)t.GetField("Key")!.GetRawConstantValue()!)
             .ToList();
 
-        keys.Should().HaveCount(15);
+        keys.Should().HaveCount(20);
         keys.Where(key => !NotificationIntentLock.TryGetContractSha256(key, 1, out _)).Should().BeEmpty();
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using QimErp.Shared.Common.Database.Configurations;
 using QimErp.Shared.Common.Entities;
 using QimErp.Shared.Common.Outbox;
@@ -46,7 +47,7 @@ public sealed class OutboxDispatchWorkerActorTests
 
         row.ProcessedAt.Should().BeNull();
         row.Attempts.Should().Be(1);
-        row.LastError.Should().Be("boom");
+        row.LastError.Should().Be("System.InvalidOperationException: boom");
     }
 
     [Fact]
@@ -60,6 +61,31 @@ public sealed class OutboxDispatchWorkerActorTests
 
         row.Attempts.Should().Be(0);
         row.LastError.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Successful_redelivery_clears_the_previous_error()
+    {
+        await using var harness = new Harness();
+        var claimed = await harness.SeedAndClaimAsync(lastError: "System.TimeoutException: earlier attempt");
+
+        harness.Dispatch(new StubTransport(null), claimed);
+        var row = await harness.WaitForRowAsync(claimed.Id, r => r.ProcessedAt != null);
+
+        row.LastError.Should().BeNull();
+        row.LockedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Recorded_error_is_truncated_to_2000_characters()
+    {
+        await using var harness = new Harness();
+        var claimed = await harness.SeedAndClaimAsync();
+
+        harness.Dispatch(new StubTransport(new InvalidOperationException(new string('x', 5000))), claimed);
+        var row = await harness.WaitForRowAsync(claimed.Id, r => r.Attempts > 0);
+
+        row.LastError.Should().HaveLength(2000).And.StartWith("System.InvalidOperationException: xxx");
     }
 
     [Fact]
@@ -78,6 +104,26 @@ public sealed class OutboxDispatchWorkerActorTests
         row.ProcessedAt.Should().BeNull();
         row.Attempts.Should().Be(0);
         row.LastError.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Postgres_failure_is_logged_and_recorded_without_row_values()
+    {
+        await using var harness = new Harness();
+        var claimed = await harness.SeedAndClaimAsync();
+        const string marker = "ama.mensah@example.com";
+        var postgres = new PostgresException(
+            $"duplicate key value violates unique constraint, value {marker}", "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation,
+            detail: $"Key (email)=({marker}) already exists.", hint: marker, where: marker,
+            schemaName: "hr", tableName: "employees", columnName: "email", constraintName: "ux_employees_email");
+
+        harness.Dispatch(new StubTransport(new DbUpdateException("An error occurred while saving the entity changes.", postgres)), claimed);
+        var warning = await harness.WaitForLogAsync<Warning>(e => e.Message.ToString()!.Contains("outbox.retry"));
+        var row = await harness.WaitForRowAsync(claimed.Id, r => r.Attempts > 0);
+
+        warning.Cause.Should().BeNull();
+        warning.ToString().Should().NotContain(marker).And.Contain("Postgres 23505");
+        row.LastError.Should().NotContain(marker).And.Contain("constraint=ux_employees_email");
     }
 
     private sealed class Harness : IAsyncDisposable
@@ -103,7 +149,7 @@ public sealed class OutboxDispatchWorkerActorTests
 
         public SaveSwitch Saves { get; } = new();
 
-        public async Task<OutboxMessage> SeedAndClaimAsync()
+        public async Task<OutboxMessage> SeedAndClaimAsync(string? lastError = null)
         {
             await using (var scope = _provider.CreateAsyncScope())
             {
@@ -119,6 +165,7 @@ public sealed class OutboxDispatchWorkerActorTests
                     OccurredAt = past,
                     NextAttemptAt = past,
                     Origin = string.Empty,
+                    LastError = lastError,
                 });
                 await db.SaveChangesAsync();
             }
