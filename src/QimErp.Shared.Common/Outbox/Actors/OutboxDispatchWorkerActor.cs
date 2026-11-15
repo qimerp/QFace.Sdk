@@ -49,6 +49,7 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
         {
             OutboxMetrics.RecordFailed();
             var error = OutboxFailureText.Describe(ex);
+            var cause = OutboxFailureText.LoggableCause(ex);
             var attempts = msg.Attempts + 1;
             var delaySeconds = Math.Min(300, Math.Pow(2, attempts));
             var dead = attempts >= Math.Max(1, _options.MaxAttempts);
@@ -56,14 +57,14 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
             if (dead)
             {
                 log.Error(
-                    ex,
+                    cause,
                     "outbox.dead Id={0} Type={1} Transport={2} Error={3}",
                     msg.Id, msg.EventType, msg.Transport, error);
             }
             else
             {
                 log.Warning(
-                    ex,
+                    cause,
                     "outbox.retry Id={0} Type={1} Attempts={2} Error={3}",
                     msg.Id, msg.EventType, attempts, error);
             }

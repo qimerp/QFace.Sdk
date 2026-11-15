@@ -46,4 +46,14 @@ public sealed class OutboxFailureTextTests
         OutboxFailureText.Describe(new InvalidOperationException("boom"))
             .Should().Be("System.InvalidOperationException: boom");
     }
+
+    [Fact]
+    public void Loggable_cause_drops_a_chain_holding_a_postgres_exception()
+    {
+        var postgres = new PostgresException(MessageText, "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation, detail: Detail);
+        var plain = new InvalidOperationException("boom");
+
+        OutboxFailureText.LoggableCause(new DbUpdateException("save failed", postgres)).Should().BeNull();
+        OutboxFailureText.LoggableCause(plain).Should().BeSameAs(plain);
+    }
 }
