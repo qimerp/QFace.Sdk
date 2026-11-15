@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "key": "tenant.workspace_request.rejected",
+  "version": 1,
+  "owner": {
+    "domain": "tenant",
+    "service": "QimErp.Platform"
+  },
+  "summary": "A workspace request was not approved; tells the requesting owner.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "workspace_owner",
+      "recipient": {
+        "source": "platform",
+        "from": "recipientId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "recipientId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "WorkspaceUrl",
+      "type": "hostname",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "workspace.example.qimerp.com",
+      "resolvedFrom": "tenant.workspaceHost"
+    }
+  ]
+}

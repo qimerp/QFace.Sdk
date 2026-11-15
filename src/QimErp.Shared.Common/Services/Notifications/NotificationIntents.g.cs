@@ -4,13 +4,61 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "2b1ddab321bade49bad8b8ab9ace8bcbddd0642c84da10b7eb2a360972d7b22d";
+    public const string ContractRevision = "fbf9e874f6a16c5b7185fc83735cec4662afbf8cb56d1e60f7a5497e32a8c84e";
+
+    public static class AppStore
+    {
+        public static class ItemInstalled
+        {
+            public const string Key = "app_store.item.installed";
+            public const int V1 = 1;
+        }
+    }
 
     public static class Auth
     {
+        public static class AccountActivationRequested
+        {
+            public const string Key = "auth.account.activation_requested";
+            public const int V1 = 1;
+        }
+        public static class MfaSetupReminder
+        {
+            public const string Key = "auth.mfa.setup_reminder";
+            public const int V1 = 1;
+        }
+        public static class PasswordAdminReset
+        {
+            public const string Key = "auth.password.admin_reset";
+            public const int V1 = 1;
+        }
+        public static class PasswordChanged
+        {
+            public const string Key = "auth.password.changed";
+            public const int V1 = 1;
+        }
         public static class PasswordResetRequested
         {
             public const string Key = "auth.password_reset.requested";
+            public const int V1 = 1;
+        }
+        public static class SignInSucceeded
+        {
+            public const string Key = "auth.sign_in.succeeded";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class Iam
+    {
+        public static class AccessReviewReminder
+        {
+            public const string Key = "iam.access_review.reminder";
+            public const int V1 = 1;
+        }
+        public static class AuditFollowUpAssigned
+        {
+            public const string Key = "iam.audit_follow_up.assigned";
             public const int V1 = 1;
         }
     }
@@ -20,6 +68,15 @@ public static class NotificationIntents
         public static class AccountManagerAssigned
         {
             public const string Key = "operator.account_manager.assigned";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class Payroll
+    {
+        public static class PayslipReady
+        {
+            public const string Key = "payroll.payslip.ready";
             public const int V1 = 1;
         }
     }
@@ -128,17 +185,76 @@ public static class NotificationIntents
         }
     }
 
+    public static class Support
+    {
+        public static class TicketAssigned
+        {
+            public const string Key = "support.ticket.assigned";
+            public const int V1 = 1;
+        }
+        public static class TicketQueued
+        {
+            public const string Key = "support.ticket.queued";
+            public const int V1 = 1;
+        }
+        public static class TicketReceived
+        {
+            public const string Key = "support.ticket.received";
+            public const int V1 = 1;
+        }
+        public static class TicketReplied
+        {
+            public const string Key = "support.ticket.replied";
+            public const int V1 = 1;
+        }
+        public static class TicketResolved
+        {
+            public const string Key = "support.ticket.resolved";
+            public const int V1 = 1;
+        }
+        public static class TicketSlaBreached
+        {
+            public const string Key = "support.ticket.sla_breached";
+            public const int V1 = 1;
+        }
+    }
+
     public static class Tenant
     {
+        public static class OwnerActivationRequested
+        {
+            public const string Key = "tenant.owner.activation_requested";
+            public const int V1 = 1;
+        }
         public static class ReplyAddressVerificationRequested
         {
             public const string Key = "tenant.reply_address.verification_requested";
+            public const int V1 = 1;
+        }
+        public static class WorkspaceReady
+        {
+            public const string Key = "tenant.workspace.ready";
+            public const int V1 = 1;
+        }
+        public static class WorkspaceRequestApproved
+        {
+            public const string Key = "tenant.workspace_request.approved";
+            public const int V1 = 1;
+        }
+        public static class WorkspaceRequestRejected
+        {
+            public const string Key = "tenant.workspace_request.rejected";
             public const int V1 = 1;
         }
     }
 
     public static class Workflow
     {
+        public static class ApprovalOverdue
+        {
+            public const string Key = "workflow.approval.overdue";
+            public const int V1 = 1;
+        }
         public static class ApprovalReminder
         {
             public const string Key = "workflow.approval.reminder";
@@ -147,6 +263,31 @@ public static class NotificationIntents
         public static class ApprovalRequested
         {
             public const string Key = "workflow.approval.requested";
+            public const int V1 = 1;
+        }
+        public static class RequestApproved
+        {
+            public const string Key = "workflow.request.approved";
+            public const int V1 = 1;
+        }
+        public static class RequestRejected
+        {
+            public const string Key = "workflow.request.rejected";
+            public const int V1 = 1;
+        }
+        public static class RequestReturned
+        {
+            public const string Key = "workflow.request.returned";
+            public const int V1 = 1;
+        }
+        public static class RequestStageAdvanced
+        {
+            public const string Key = "workflow.request.stage_advanced";
+            public const int V1 = 1;
+        }
+        public static class RequestStarted
+        {
+            public const string Key = "workflow.request.started";
             public const int V1 = 1;
         }
     }
