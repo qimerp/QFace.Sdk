@@ -40,17 +40,20 @@ public class LoggingOptions
     public string TransportType { get; set; } = "Udp";
 
     /// <summary>
-    /// Per-category minimum levels; a key set in configuration replaces the default for that category.
+    /// Per-category minimum levels; configuration adds keys or replaces a default's level, it cannot remove one.
     /// </summary>
     public Dictionary<string, LogEventLevel> Overrides { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Microsoft.AspNetCore"] = LogEventLevel.Warning,
+        ["Microsoft.AspNetCore.Authentication"] = LogEventLevel.Information,
+        ["Microsoft.AspNetCore.Authorization"] = LogEventLevel.Information,
+        ["Microsoft.AspNetCore.Cors"] = LogEventLevel.Information,
         ["System.Net.Http.HttpClient"] = LogEventLevel.Warning,
         ["Polly"] = LogEventLevel.Warning,
     };
 
     /// <summary>
-    /// Request paths whose below-Warning events are dropped, so uptime probes do not flood the logs.
+    /// Below-Warning events for these request paths (and their child paths) are dropped; configuration appends to the defaults.
     /// </summary>
     public string[] HealthCheckPaths { get; set; } = { "/ready", "/live", "/alive", "/health" };
 }

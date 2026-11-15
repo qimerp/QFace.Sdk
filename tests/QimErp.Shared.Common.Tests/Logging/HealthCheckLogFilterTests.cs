@@ -40,5 +40,8 @@ public sealed class HealthCheckLogFilterTests
 
         overrides.Should().Contain("Microsoft.AspNetCore", LogEventLevel.Warning);
         overrides.Should().Contain("System.Net.Http.HttpClient", LogEventLevel.Warning);
+        overrides.Should().Contain("Microsoft.AspNetCore.Authentication", LogEventLevel.Information);
+        overrides.Should().Contain("Microsoft.AspNetCore.Authorization", LogEventLevel.Information);
+        overrides.Should().Contain("Microsoft.AspNetCore.Cors", LogEventLevel.Information);
     }
 }
