@@ -15,4 +15,8 @@ public static class WorkflowDefinitionCacheKeys
 
     public static string Configuration(string tenantId, string module, string entityType) =>
         $"{Prefix}config:{tenantId}:{module}:{entityType}";
+
+    /// <summary>Written by Platform only after every key write succeeded; must not outlive the keys it vouches for.</summary>
+    public static string TenantWarmMarker(string tenantId) =>
+        $"{Prefix}warm:{tenantId}";
 }

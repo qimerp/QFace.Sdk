@@ -13,7 +13,8 @@ public class WorkflowValidationService(
     IWorkflowConfigCacheService configCacheService,
     IWorkflowService workflowService,
     ICurrentUserService currentUserService,
-    ILogger<WorkflowValidationService> logger) : IWorkflowValidationService
+    ILogger<WorkflowValidationService> logger,
+    IConfiguration? configuration = null) : IWorkflowValidationService
 #pragma warning restore CS9113
 {
     public Task<Result> ValidateCanEditAsync(IWorkflowEnabled entity)
@@ -85,10 +86,24 @@ public class WorkflowValidationService(
         return Task.FromResult(Result.WithSuccess());
     }
 
+    /// <remarks>Uses the service-wide <c>Workflow:Module</c>; interceptors that map entities to other modules decide with their own mapping.</remarks>
     public async Task<bool> RequiresApprovalAsync(IWorkflowEnabled entity, string operation)
     {
-        // Note: Module should be passed from caller, but for backward compatibility we'll pass null
-        // This method may need to be updated to accept module parameter in the future
-        return await workflowService.ShouldTriggerWorkflow(entity, operation, null);
+        var module = configuration?["Workflow:Module"]
+                     ?? configuration?["Workflow:ModuleCategory"]
+                     ?? configuration?["Workflow:ModuleName"];
+
+        if (string.IsNullOrWhiteSpace(module))
+        {
+            var tenantId = currentUserService.GetTenantId();
+            logger.LogError(
+                "Workflow:Module is not configured; cannot decide whether {EntityType} {Operation} needs approval — refusing",
+                entity.EntityType, operation);
+            WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                WorkflowApprovalGateMetrics.ModuleUnresolved, null, entity.EntityType, operation);
+            throw new WorkflowApprovalStateUnavailableException(tenantId ?? string.Empty, null, entity.EntityType, operation);
+        }
+
+        return await workflowService.ShouldTriggerWorkflow(entity, operation, module);
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using QimErp.Shared.Common.Logging;
+using QimErp.Shared.Common.Services.Workflow;
 
 namespace QimErp.Shared.Common.ExceptionHandlers;
 
@@ -24,6 +25,8 @@ namespace QimErp.Shared.Common.ExceptionHandlers;
 /// </summary>
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
+    private const string ApprovalUnavailableRetryAfterSeconds = "5";
+
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -50,6 +53,43 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             {
                 Title = "Validation failed",
                 Status = StatusCodes.Status400BadRequest,
+                Instance = httpContext.Request.Path,
+            }, cancellationToken);
+
+            return true;
+        }
+
+        if (exception is WorkflowPresetCodeMismatchException presetMismatch)
+        {
+            logger.LogWarning(
+                "Preset workflow code rejected in {Endpoint} (TenantId={TenantId}, Module={Module}, EntityType={EntityType})",
+                endpoint, presetMismatch.TenantId, presetMismatch.Module, presetMismatch.EntityType);
+
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
+            {
+                Title = "Approval workflow does not match",
+                Detail = presetMismatch.Message,
+                Status = StatusCodes.Status409Conflict,
+                Instance = httpContext.Request.Path,
+            }, cancellationToken);
+
+            return true;
+        }
+
+        if (exception is WorkflowApprovalStateUnavailableException approvalUnavailable)
+        {
+            logger.LogWarning(
+                "Approval state unavailable in {Endpoint} (TenantId={TenantId}, Module={Module}, EntityType={EntityType}, Operation={Operation})",
+                endpoint, approvalUnavailable.TenantId, approvalUnavailable.Module, approvalUnavailable.EntityType, approvalUnavailable.Operation);
+
+            httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            httpContext.Response.Headers.RetryAfter = ApprovalUnavailableRetryAfterSeconds;
+            await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
+            {
+                Title = "Approval settings are temporarily unavailable",
+                Detail = approvalUnavailable.Message,
+                Status = StatusCodes.Status503ServiceUnavailable,
                 Instance = httpContext.Request.Path,
             }, cancellationToken);
 

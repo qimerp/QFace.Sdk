@@ -456,6 +456,8 @@ public static class SharedServiceCollectionExtensions
         services.AddScoped<IDistributedCacheService, RedisCacheService>();
         services.AddScoped<ICacheService, RedisCacheService>();
         services.AddScoped<ISharedDistributedCacheService, SharedRedisCacheService>();
+        if (!configuration.GetValue("RedisCache:Enabled", true))
+            services.AddHostedService<RedisCacheDisabledStartupCheck>();
         services.AddHttpClient("microsoft365-graph");
         services.AddHttpClient("microsoft365-token");
         services.AddScoped<IMicrosoft365GraphClient, Microsoft365GraphClient>();
@@ -826,7 +828,8 @@ public static class SharedServiceCollectionExtensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter(WorkflowApprovalGateMetrics.MeterName);
             })
             .WithTracing(tracing =>
             {

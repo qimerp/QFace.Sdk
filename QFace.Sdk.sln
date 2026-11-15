@@ -103,6 +103,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QFace.Sdk.RedisCache.Tests"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QimErp.Shared.DataIntegrity", "src\QimErp.Shared.DataIntegrity\QimErp.Shared.DataIntegrity.csproj", "{1D957213-34C8-4D96-8E6C-0A8C7F6DACD9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QimErp.Shared.Common.Testing", "src\QimErp.Shared.Common.Testing\QimErp.Shared.Common.Testing.csproj", "{A082790C-5069-4CA6-BFC1-6973E3630CE2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QimErp.Shared.Common.Testing.Tests", "tests\QimErp.Shared.Common.Testing.Tests\QimErp.Shared.Common.Testing.Tests.csproj", "{6F0B7C2E-3D5A-4E8B-9C1F-2A4D6E8F0B13}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -305,6 +309,14 @@ Global
 		{1D957213-34C8-4D96-8E6C-0A8C7F6DACD9}.Release|x64.Build.0 = Release|Any CPU
 		{1D957213-34C8-4D96-8E6C-0A8C7F6DACD9}.Release|x86.ActiveCfg = Release|Any CPU
 		{1D957213-34C8-4D96-8E6C-0A8C7F6DACD9}.Release|x86.Build.0 = Release|Any CPU
+		{A082790C-5069-4CA6-BFC1-6973E3630CE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A082790C-5069-4CA6-BFC1-6973E3630CE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A082790C-5069-4CA6-BFC1-6973E3630CE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A082790C-5069-4CA6-BFC1-6973E3630CE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F0B7C2E-3D5A-4E8B-9C1F-2A4D6E8F0B13}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F0B7C2E-3D5A-4E8B-9C1F-2A4D6E8F0B13}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F0B7C2E-3D5A-4E8B-9C1F-2A4D6E8F0B13}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F0B7C2E-3D5A-4E8B-9C1F-2A4D6E8F0B13}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -349,5 +361,7 @@ Global
 		{F59C3F25-6C78-4592-A4B7-503A5B0846C1} = {69C5394F-80E3-40E0-9037-836A716C3E9A}
 		{2BACB2F4-26BC-441D-B350-863BCE57BE96} = {69C5394F-80E3-40E0-9037-836A716C3E9A}
 		{1D957213-34C8-4D96-8E6C-0A8C7F6DACD9} = {7BEE4B5C-A063-4EB1-B09A-74751B8DD92E}
+		{A082790C-5069-4CA6-BFC1-6973E3630CE2} = {7BEE4B5C-A063-4EB1-B09A-74751B8DD92E}
+		{6F0B7C2E-3D5A-4E8B-9C1F-2A4D6E8F0B13} = {69C5394F-80E3-40E0-9037-836A716C3E9A}
 	EndGlobalSection
 EndGlobal
