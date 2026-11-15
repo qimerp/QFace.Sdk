@@ -58,6 +58,20 @@ public class NotificationIntentsDriftTests
     }
 
     [Fact]
+    public void Lock_CarriesAll25Contracts_IncludingLeaveAndSurveyIntents()
+    {
+        NotificationIntentLock.Contracts.Should().HaveCount(25);
+        NotificationIntentLock.Contracts.Keys.Should().Contain(
+        [
+            NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestSubmitted.Key, NotificationIntents.People.LeaveRequestSubmitted.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestDecided.Key, NotificationIntents.People.LeaveRequestDecided.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.LeaveCoverAssigned.Key, NotificationIntents.People.LeaveCoverAssigned.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.SurveyInvited.Key, NotificationIntents.People.SurveyInvited.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.SurveyReminded.Key, NotificationIntents.People.SurveyReminded.V1),
+        ]);
+    }
+
+    [Fact]
     public void Lock_IsLoadedFromTheEmbeddedResource()
     {
         typeof(NotificationIntentLock).Assembly.GetManifestResourceNames().Should().Contain(NotificationIntentLock.ResourceName);
