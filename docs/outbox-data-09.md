@@ -106,51 +106,84 @@ stays pending; replay it from that origin or update its `Origin` by hand.
 the model and EF reports pending changes until a migration exists.
 
 1. Bump `QimErp.Shared.Common` to 3.11.55 or later.
-2. `dotnet ef migrations add AddOutboxOrigin --project <Infrastructure/Shared project> --startup-project <WebApi>`
-   (once per DbContext that maps `OutboxMessage`).
-3. Keep the scaffolded `AddColumn` (`Origin`, `text`, nullable; no default, so Postgres adds it
-   without a rewrite). Replace the scaffolded `CreateIndex` with a concurrent build so writers are
-   not blocked. Qualify every statement with the table's schema (`public` for most services,
-   `reporting` for Reporting). A `CREATE INDEX CONCURRENTLY` that was interrupted leaves an invalid
-   index that `IF NOT EXISTS` would keep, so drop an invalid one first:
+2. Add **two** migrations per DbContext that maps `OutboxMessage`. Keep the column and the index
+   apart: EF records a migration only after all of its statements succeed, so if a single migration
+   held both and the concurrent index build was interrupted, the rerun would repeat `AddColumn` and
+   fail. With the split, a rerun redoes only the idempotent index migration. Qualify the index SQL
+   with the table's schema (`public` for most services, `reporting` for Reporting).
+
+   Reference: QimErp.Platform `development` 4a4b0e3,
+   `src/QimErp.Platform.Shared/Database/Migrations/20261115030836_AddOutboxOrigin.cs` and
+   `20261115032337_AddOutboxOriginIndex.cs`.
+
+3. **`AddOutboxOrigin`** — `dotnet ef migrations add AddOutboxOrigin --project <Infrastructure/Shared project> --startup-project <WebApi>`.
+   Delete the scaffolded `CreateIndex` / `DropIndex`; the model snapshot keeps the index. Keep the
+   nullable `AddColumn` (no default, so Postgres adds it without a rewrite) behind a lock timeout:
 
    ```csharp
-   const string schema = "public";
+   protected override void Up(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.Sql("SET LOCAL lock_timeout = '15s';");
 
-   migrationBuilder.Sql(
-       $$"""
-       SET LOCAL lock_timeout = '15s';
-       DO $drop$
-       BEGIN
-           IF EXISTS (
-               SELECT 1
-                 FROM pg_index i
-                 JOIN pg_class c ON c.oid = i.indexrelid
-                 JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = '{{schema}}'
-                  AND c.relname = 'ix_outbox_origin_ready'
-                  AND NOT i.indisvalid) THEN
-               DROP INDEX "{{schema}}".ix_outbox_origin_ready;
-           END IF;
-       END
-       $drop$;
-       """);
+       migrationBuilder.AddColumn<string>(
+           name: "Origin",
+           table: "OutboxMessages",
+           type: "text",
+           nullable: true);
+   }
 
-   migrationBuilder.Sql(
-       $$"""
-       CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_outbox_origin_ready
-           ON "{{schema}}"."OutboxMessages" ("Origin", "NextAttemptAt")
-           WHERE "ProcessedAt" IS NULL AND "DeadAt" IS NULL;
-       """,
-       suppressTransaction: true);
+   protected override void Down(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.DropColumn(
+           name: "Origin",
+           table: "OutboxMessages");
+   }
    ```
 
-   `Down`, before the scaffolded `DropColumn`:
+   **`AddOutboxOriginIndex`** — `dotnet ef migrations add AddOutboxOriginIndex ...` scaffolds an
+   empty migration (the model already has the index). Fill it in. An interrupted
+   `CREATE INDEX CONCURRENTLY` leaves an invalid index that `IF NOT EXISTS` would keep, so drop an
+   invalid one first, then build concurrently outside a transaction:
 
    ```csharp
-   migrationBuilder.Sql(
-       $$"""DROP INDEX CONCURRENTLY IF EXISTS "{{schema}}".ix_outbox_origin_ready;""",
-       suppressTransaction: true);
+   private const string Schema = "public";
+
+   protected override void Up(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.Sql(
+           $$"""
+           SET LOCAL lock_timeout = '15s';
+           DO $drop$
+           BEGIN
+               IF EXISTS (
+                   SELECT 1
+                     FROM pg_index i
+                     JOIN pg_class c ON c.oid = i.indexrelid
+                     JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = '{{Schema}}'
+                      AND c.relname = 'ix_outbox_origin_ready'
+                      AND NOT i.indisvalid) THEN
+                   DROP INDEX "{{Schema}}".ix_outbox_origin_ready;
+               END IF;
+           END
+           $drop$;
+           """);
+
+       migrationBuilder.Sql(
+           $$"""
+           CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_outbox_origin_ready
+               ON "{{Schema}}"."OutboxMessages" ("Origin", "NextAttemptAt")
+               WHERE "ProcessedAt" IS NULL AND "DeadAt" IS NULL;
+           """,
+           suppressTransaction: true);
+   }
+
+   protected override void Down(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.Sql(
+           $$"""DROP INDEX CONCURRENTLY IF EXISTS "{{Schema}}".ix_outbox_origin_ready;""",
+           suppressTransaction: true);
+   }
    ```
 
    After applying, confirm the index is valid:
@@ -162,7 +195,7 @@ the model and EF reports pending changes until a migration exists.
      JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relname = 'ix_outbox_origin_ready';
    ```
-4. Apply the migration before any 3.11.55 binary of that service starts; otherwise the startup
+4. Apply both migrations before any 3.11.55 binary of that service starts; otherwise the startup
    check stops the host. The change is additive, so binaries on older SDKs keep working against
    the migrated table.
 5. Upgrade the deployed service and every developer machine. Until all of them run 3.11.55+, an
