@@ -68,7 +68,57 @@ Table shape (Postgres):
 | LastError | text |
 | ProcessedAt / DeadAt | timestamptz |
 
-Index: ready rows on `NextAttemptAt` where `ProcessedAt` and `DeadAt` are null.
+| Origin | text, nullable (3.11.55+) |
+
+Indexes: ready rows on `NextAttemptAt`, and on `(Origin, NextAttemptAt)` (`ix_outbox_origin_ready`, 3.11.55+),
+both where `ProcessedAt` and `DeadAt` are null.
+
+## Origin: one database, many machines (3.11.55+)
+
+Laptops and the deployed services share one database per module. Every row records the writer's
+effective `Temporal:TaskQueueSuffix` in `Origin` (`""` when deployed), and a relay claims only rows
+of its own origin, so a laptop never runs or dispatches work written by Contabo or another laptop.
+
+| Row `Origin` | Claimed by |
+| --- | --- |
+| `""` | the unsuffixed (deployed) relay |
+| `"-local"`, `"-local-pd"`, ... | only a relay with that exact suffix |
+| `NULL` (written by an SDK before 3.11.55) | only the unsuffixed (deployed) relay |
+
+`IOutbox.Add` stamps the origin. Rows added directly (`db.OutboxMessages.Add(new OutboxMessage { ... })`)
+are stamped by `AuditEntitySaveChangesInterceptor` when `Origin` is null, so contexts registered with
+`AddDbContextWithOutbox*` are covered. A row whose writer never comes back (a laptop that went offline)
+stays pending; replay it from that origin or update its `Origin` by hand.
+
+### Consumer upgrade steps (each service that owns an `OutboxMessages` table)
+
+`OutboxMessageConfiguration` is applied by `ApplicationDbContext`, so bumping the package changes
+the model and EF reports pending changes until a migration exists.
+
+1. Bump `QimErp.Shared.Common` to 3.11.55 or later.
+2. `dotnet ef migrations add AddOutboxOrigin --project <Infrastructure/Shared project> --startup-project <WebApi>`
+   (once per DbContext that maps `OutboxMessage`).
+3. Keep the scaffolded `AddColumn` (`Origin`, `text`, nullable; no default, so Postgres adds it
+   without a rewrite). Replace the scaffolded `CreateIndex` with a concurrent build so writers are
+   not blocked; use the table's schema if it is not `public`:
+
+   ```csharp
+   migrationBuilder.Sql(
+       """
+       CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_outbox_origin_ready
+           ON "OutboxMessages" ("Origin", "NextAttemptAt")
+           WHERE "ProcessedAt" IS NULL AND "DeadAt" IS NULL;
+       """,
+       suppressTransaction: true);
+   ```
+
+   `Down`: `DROP INDEX CONCURRENTLY IF EXISTS ix_outbox_origin_ready;` (also `suppressTransaction: true`),
+   then the scaffolded `DropColumn`.
+4. Apply the migration before any 3.11.55 binary of that service starts. The change is additive,
+   so binaries on older SDKs keep working against the migrated table.
+5. Upgrade the deployed service and every developer machine. Until all of them run 3.11.55+, an
+   older relay still claims rows of any origin.
+6. Do not backfill `Origin` on existing rows: pending `NULL` rows belong to the deployed relay.
 
 ## Configuration
 

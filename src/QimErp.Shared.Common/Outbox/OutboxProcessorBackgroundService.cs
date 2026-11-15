@@ -77,7 +77,10 @@ public sealed class OutboxProcessorBackgroundService<TContext> : BackgroundServi
         using (var scope = _scopeFactory.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
+            var origin = scope.ServiceProvider.GetService<OutboxOrigin>()
+                         ?? OutboxOrigin.FromServices(scope.ServiceProvider);
             pendingIds = await context.Set<OutboxMessage>()
+                .OwnedBy(origin)
                 .Where(m => m.ProcessedAt == null && m.DeadAt == null)
                 .OrderBy(m => m.OccurredAt)
                 .Take(_options.BatchSize)

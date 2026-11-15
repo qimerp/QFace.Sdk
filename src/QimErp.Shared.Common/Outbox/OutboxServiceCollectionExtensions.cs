@@ -22,18 +22,21 @@ public static class OutboxServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<ITransportRouting, TransportRouting>();
+        services.TryAddSingleton(OutboxOrigin.FromServices);
 
         services.TryAddScoped<OutboxStore>(sp =>
             new OutboxStore(
                 sp.GetRequiredService<TContext>(),
                 sp.GetRequiredService<ILogger<OutboxStore>>(),
-                sp.GetRequiredService<InProcessEventTypeCatalog>()));
+                sp.GetRequiredService<InProcessEventTypeCatalog>(),
+                sp.GetRequiredService<OutboxOrigin>()));
 
         services.TryAddScoped<IOutbox>(sp =>
             new EfOutbox(
                 sp.GetRequiredService<TContext>(),
                 sp.GetRequiredService<ITransportRouting>(),
-                sp.GetRequiredService<TimeProvider>()));
+                sp.GetRequiredService<TimeProvider>(),
+                sp.GetRequiredService<OutboxOrigin>()));
 
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IEventTransport, InProcessEventTransport>());

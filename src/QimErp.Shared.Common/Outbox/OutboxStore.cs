@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using QimErp.Shared.Common.Outbox.Transports;
 
@@ -12,17 +13,28 @@ public sealed class OutboxStore
     private readonly DbContext _db;
     private readonly ILogger<OutboxStore> _logger;
     private readonly InProcessEventTypeCatalog? _inProcessTypes;
+    private readonly OutboxOrigin _origin;
 
     public OutboxStore(DbContext db, ILogger<OutboxStore> logger)
-        : this(db, logger, null)
+        : this(db, logger, null, OutboxOrigin.Deployed)
     {
     }
 
-    internal OutboxStore(DbContext db, ILogger<OutboxStore> logger, InProcessEventTypeCatalog? inProcessTypes)
+    public OutboxStore(DbContext db, ILogger<OutboxStore> logger, OutboxOrigin origin)
+        : this(db, logger, null, origin)
+    {
+    }
+
+    internal OutboxStore(
+        DbContext db,
+        ILogger<OutboxStore> logger,
+        InProcessEventTypeCatalog? inProcessTypes,
+        OutboxOrigin origin)
     {
         _db = db;
         _logger = logger;
         _inProcessTypes = inProcessTypes;
+        _origin = origin;
     }
 
     public async Task<List<OutboxMessage>> ClaimAsync(
@@ -43,7 +55,7 @@ public sealed class OutboxStore
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "PostgreSQL outbox claim failed. Node={Node}", node);
+                _logger.LogError(ex, "PostgreSQL outbox claim failed. Node={Node}, Origin={Origin}", node, _origin.Value);
                 throw;
             }
         }
@@ -58,7 +70,7 @@ public sealed class OutboxStore
         if (known is null)
             return [];
 
-        var rows = await _db.Set<OutboxMessage>()
+        var rows = await _db.Set<OutboxMessage>().OwnedBy(_origin)
             .Where(m => m.ProcessedAt == null
                         && m.DeadAt == null
                         && m.Transport == OutboxTransports.InProcess
@@ -145,29 +157,49 @@ public sealed class OutboxStore
         IReadOnlyList<string>? known,
         CancellationToken cancellationToken)
     {
-        var filterInProcess = known is not null;
-        var knownTypes = known?.ToArray() ?? [];
-        FormattableString sql = $"""
-            UPDATE "OutboxMessages" m
-               SET "LockedUntil" = now() + ({lease.TotalSeconds} * interval '1 second'),
-                   "LockedBy" = {node}
-             WHERE m."Id" IN (
-                   SELECT "Id" FROM "OutboxMessages"
-                    WHERE "ProcessedAt" IS NULL AND "DeadAt" IS NULL
-                      AND "NextAttemptAt" <= now()
-                      AND ("LockedUntil" IS NULL OR "LockedUntil" < now())
-                      AND (NOT {filterInProcess} OR "Transport" <> {OutboxTransports.InProcess}
-                           OR lower("EventType") = ANY({knownTypes}))
-                    ORDER BY "OccurredAt"
-                    LIMIT {batchSize}
-                    FOR UPDATE SKIP LOCKED)
-            RETURNING m.*
-            """;
+        var sql = ClaimSql(_origin, node, batchSize, lease, known);
 
         return await _db.Set<OutboxMessage>()
             .FromSql(sql)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
+    }
+
+    internal static FormattableString ClaimSql(
+        OutboxOrigin origin,
+        string node,
+        int batchSize,
+        TimeSpan lease,
+        IReadOnlyList<string>? known)
+    {
+        var originFilter = origin.IsDeployed
+            ? "(\"Origin\" = {6} OR \"Origin\" IS NULL)"
+            : "\"Origin\" = {6}";
+        return FormattableStringFactory.Create(
+            $$"""
+            UPDATE "OutboxMessages" m
+               SET "LockedUntil" = now() + ({0} * interval '1 second'),
+                   "LockedBy" = {1}
+             WHERE m."Id" IN (
+                   SELECT "Id" FROM "OutboxMessages"
+                    WHERE "ProcessedAt" IS NULL AND "DeadAt" IS NULL
+                      AND {{originFilter}}
+                      AND "NextAttemptAt" <= now()
+                      AND ("LockedUntil" IS NULL OR "LockedUntil" < now())
+                      AND (NOT {2} OR "Transport" <> {3}
+                           OR lower("EventType") = ANY({4}))
+                    ORDER BY "OccurredAt"
+                    LIMIT {5}
+                    FOR UPDATE SKIP LOCKED)
+            RETURNING m.*
+            """,
+            lease.TotalSeconds,
+            node,
+            known is not null,
+            OutboxTransports.InProcess,
+            known?.ToArray() ?? [],
+            batchSize,
+            origin.Value);
     }
 
     private async Task<List<OutboxMessage>> ClaimWithLinqAsync(
@@ -178,7 +210,7 @@ public sealed class OutboxStore
         IReadOnlyList<string>? known,
         CancellationToken cancellationToken)
     {
-        var query = _db.Set<OutboxMessage>()
+        var query = _db.Set<OutboxMessage>().OwnedBy(_origin)
             .Where(m => m.ProcessedAt == null
                         && m.DeadAt == null
                         && m.NextAttemptAt <= now
