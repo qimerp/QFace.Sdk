@@ -38,4 +38,19 @@ public class LoggingOptions
     /// Defaults to Udp for better performance
     /// </summary>
     public string TransportType { get; set; } = "Udp";
+
+    /// <summary>
+    /// Per-category minimum levels; a key set in configuration replaces the default for that category.
+    /// </summary>
+    public Dictionary<string, LogEventLevel> Overrides { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Microsoft.AspNetCore"] = LogEventLevel.Warning,
+        ["System.Net.Http.HttpClient"] = LogEventLevel.Warning,
+        ["Polly"] = LogEventLevel.Warning,
+    };
+
+    /// <summary>
+    /// Request paths whose below-Warning events are dropped, so uptime probes do not flood the logs.
+    /// </summary>
+    public string[] HealthCheckPaths { get; set; } = { "/ready", "/live", "/alive", "/health" };
 }
