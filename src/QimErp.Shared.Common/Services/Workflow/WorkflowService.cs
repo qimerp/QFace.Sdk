@@ -3,7 +3,6 @@ using QimErp.Shared.Common.Options;
 using QimErp.Shared.Common.Services.MultiTenancy;
 
 using QimErp.Shared.Common.Services.TenantSetup;
-using QimErp.Shared.Common.TenantSetup;
 
 namespace QimErp.Shared.Common.Services.Workflow;
 
@@ -13,42 +12,63 @@ public class WorkflowService(
     ITenantContext tenantContext,
     IOptions<SystemOptions> systemOptions,
     ILogger<WorkflowService> logger,
-    ICurrentUserService? currentUserService = null)
+    ICurrentUserService? currentUserService = null,
+    IWorkflowDefinitionProvider? definitionProvider = null)
     : IWorkflowService
 {
     private readonly SystemOptions _systemOptions = systemOptions.Value;
 
     public async Task<bool> ShouldTriggerWorkflow(IWorkflowEnabled entity, string operation, string? module = null)
     {
-        try
+        operation = operation.ToUpperInvariant();
+        var entityType = entity.EntityType;
+        var tenantId = ResolveTenantId(entity);
+
+        if (string.IsNullOrWhiteSpace(module))
         {
-            string entityType = entity.EntityType;
-            var tenantId = ResolveTenantId(entity);
-
-            if (!await moduleAccess.IsModuleEnabledAsync(tenantId, ModuleKeys.Workflow))
-                return false;
-
-            if (string.IsNullOrWhiteSpace(module))
-            {
-                logger.LogDebug("Module not provided for ShouldTriggerWorkflow. Skipping workflow configuration check for {EntityType}", entityType);
-                return false;
-            }
-
-            if (!await configCacheService.IsWorkflowEnabledAsync(module, entityType, operation, tenantId))
-                return false;
-
-            List<WorkflowTriggerCondition> conditions =
-                await configCacheService.GetTriggerConditionsAsync(module, entityType, operation, tenantId);
-            if (!conditions.Any())
-                return true;
-
-            return WorkflowTriggerConditionEvaluator.EvaluateAll(entity, conditions);
+            logger.LogError(
+                "No workflow module given for {EntityType} {Operation}; cannot decide whether approval is needed — refusing",
+                entityType, operation);
+            WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                WorkflowApprovalGateMetrics.ModuleUnresolved, null, entityType, operation);
+            throw new WorkflowApprovalStateUnavailableException(tenantId, null, entityType, operation);
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error evaluating workflow trigger for Module: {Module}, EntityType: {EntityType}, Operation: {Operation}", module, entity.EntityType, operation);
+
+        var presetCode = operation == "CREATE" ? entity.WorkflowCode : null;
+        var gateState = await WorkflowModuleApprovalGate.EvaluateAsync(
+            moduleAccess, configCacheService, definitionProvider, logger, tenantId, module, entityType, presetCode, operation, entity, CancellationToken.None);
+        if (gateState == WorkflowApprovalGateState.Unavailable)
+            throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
+        if (gateState == WorkflowApprovalGateState.Off)
             return false;
+
+        var lookup = await configCacheService.LookupEntityConfigAsync(module, entityType, tenantId);
+        if (lookup.Status == WorkflowConfigLookupStatus.Unknown)
+        {
+            WorkflowApprovalGateMetrics.RecordStateUnreadable(
+                WorkflowApprovalGateMetrics.ConfigSource, module, entityType, operation);
+            throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
         }
+
+        if (lookup.Config is not { } config)
+        {
+            var (withoutConfig, _) = await WorkflowModuleApprovalGate.ResolveWithoutConfigAsync(
+                configCacheService, definitionProvider, logger, tenantId, module, entityType, operation, presetCode, CancellationToken.None);
+            if (withoutConfig == WorkflowApprovalGateState.Unavailable)
+                throw new WorkflowApprovalStateUnavailableException(tenantId, module, entityType, operation);
+
+            return withoutConfig == WorkflowApprovalGateState.On;
+        }
+
+        var (enabled, conditions) = operation switch
+        {
+            "CREATE" => (config.EnableWorkflowForCreate, config.CreateTriggerConditions),
+            "UPDATE" => (config.EnableWorkflowForUpdate, []),
+            "DELETE" => (config.EnableWorkflowForDelete, []),
+            _ => (false, new List<WorkflowTriggerCondition>())
+        };
+
+        return enabled && WorkflowTriggerConditionEvaluator.EvaluateAll(entity, conditions);
     }
 
     public Task InitiateWorkflowAsync(IWorkflowEnabled entity, string operation, WorkflowDefinition? workflowDefinition = null)
