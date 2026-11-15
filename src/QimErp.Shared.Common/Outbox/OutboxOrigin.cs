@@ -13,7 +13,6 @@ public sealed class OutboxOrigin
 
     public bool IsDeployed => Value.Length == 0;
 
-    /// <summary>The only resolver of the effective task queue suffix; the outbox Temporal transport uses it too.</summary>
     public static OutboxOrigin FromServices(IServiceProvider services)
     {
         var fromOptions = services.GetService<IOptions<TemporalOptions>>()?.Value.TaskQueueSuffix;
