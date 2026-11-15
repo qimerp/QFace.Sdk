@@ -46,7 +46,7 @@ public sealed class OutboxDispatchWorkerActorTests
 
         row.ProcessedAt.Should().BeNull();
         row.Attempts.Should().Be(1);
-        row.LastError.Should().Be("boom");
+        row.LastError.Should().Be("System.InvalidOperationException: boom");
     }
 
     [Fact]
@@ -60,6 +60,31 @@ public sealed class OutboxDispatchWorkerActorTests
 
         row.Attempts.Should().Be(0);
         row.LastError.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Successful_redelivery_clears_the_previous_error()
+    {
+        await using var harness = new Harness();
+        var claimed = await harness.SeedAndClaimAsync(lastError: "System.TimeoutException: earlier attempt");
+
+        harness.Dispatch(new StubTransport(null), claimed);
+        var row = await harness.WaitForRowAsync(claimed.Id, r => r.ProcessedAt != null);
+
+        row.LastError.Should().BeNull();
+        row.LockedBy.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Recorded_error_is_truncated_to_2000_characters()
+    {
+        await using var harness = new Harness();
+        var claimed = await harness.SeedAndClaimAsync();
+
+        harness.Dispatch(new StubTransport(new InvalidOperationException(new string('x', 5000))), claimed);
+        var row = await harness.WaitForRowAsync(claimed.Id, r => r.Attempts > 0);
+
+        row.LastError.Should().HaveLength(2000).And.StartWith("System.InvalidOperationException: xxx");
     }
 
     [Fact]
@@ -103,7 +128,7 @@ public sealed class OutboxDispatchWorkerActorTests
 
         public SaveSwitch Saves { get; } = new();
 
-        public async Task<OutboxMessage> SeedAndClaimAsync()
+        public async Task<OutboxMessage> SeedAndClaimAsync(string? lastError = null)
         {
             await using (var scope = _provider.CreateAsyncScope())
             {
@@ -119,6 +144,7 @@ public sealed class OutboxDispatchWorkerActorTests
                     OccurredAt = past,
                     NextAttemptAt = past,
                     Origin = string.Empty,
+                    LastError = lastError,
                 });
                 await db.SaveChangesAsync();
             }

@@ -83,7 +83,8 @@ public sealed class OutboxStore
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(m => m.ProcessedAt, DateTimeOffset.UtcNow)
                     .SetProperty(m => m.LockedUntil, (DateTimeOffset?)null)
-                    .SetProperty(m => m.LockedBy, (string?)null),
+                    .SetProperty(m => m.LockedBy, (string?)null)
+                    .SetProperty(m => m.LastError, (string?)null),
                     cancellationToken);
             return;
         }
@@ -93,6 +94,7 @@ public sealed class OutboxStore
         row.ProcessedAt = DateTimeOffset.UtcNow;
         row.LockedUntil = null;
         row.LockedBy = null;
+        row.LastError = null;
         await _db.SaveChangesAsync(cancellationToken);
     }
 

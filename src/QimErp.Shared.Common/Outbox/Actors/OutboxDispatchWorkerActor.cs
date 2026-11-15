@@ -48,6 +48,7 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
         catch (Exception ex)
         {
             OutboxMetrics.RecordFailed();
+            var error = OutboxFailureText.Describe(ex);
             var attempts = msg.Attempts + 1;
             var delaySeconds = Math.Min(300, Math.Pow(2, attempts));
             var dead = attempts >= Math.Max(1, _options.MaxAttempts);
@@ -57,20 +58,20 @@ internal sealed class OutboxDispatchWorkerActor : ReceiveActor
                 log.Error(
                     ex,
                     "outbox.dead Id={0} Type={1} Transport={2} Error={3}",
-                    msg.Id, msg.EventType, msg.Transport, ex.Message);
+                    msg.Id, msg.EventType, msg.Transport, error);
             }
             else
             {
                 log.Warning(
                     ex,
                     "outbox.retry Id={0} Type={1} Attempts={2} Error={3}",
-                    msg.Id, msg.EventType, attempts, ex.Message);
+                    msg.Id, msg.EventType, attempts, error);
             }
 
             await store.ScheduleRetryAsync(
                 msg.Id,
                 attempts,
-                ex.Message,
+                error,
                 DateTimeOffset.UtcNow.AddSeconds(delaySeconds),
                 dead,
                 CancellationToken.None);
