@@ -15,16 +15,6 @@ public sealed class OutboxStore
     private readonly InProcessEventTypeCatalog? _inProcessTypes;
     private readonly OutboxOrigin _origin;
 
-    public OutboxStore(DbContext db, ILogger<OutboxStore> logger)
-        : this(db, logger, null, OutboxOrigin.Deployed)
-    {
-    }
-
-    public OutboxStore(DbContext db, ILogger<OutboxStore> logger, OutboxOrigin origin)
-        : this(db, logger, null, origin)
-    {
-    }
-
     internal OutboxStore(
         DbContext db,
         ILogger<OutboxStore> logger,

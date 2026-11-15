@@ -3,11 +3,6 @@ using QFace.Sdk.Temporal.Options;
 
 namespace QimErp.Shared.Common.Outbox;
 
-/// <summary>
-/// The writing and relaying process's effective <c>Temporal:TaskQueueSuffix</c>; empty for deployed services.
-/// A relay claims only rows whose <see cref="OutboxMessage.Origin"/> matches its own, and the deployed
-/// relay also claims rows with a null origin.
-/// </summary>
 public sealed class OutboxOrigin
 {
     public static readonly OutboxOrigin Deployed = new(string.Empty);
@@ -18,6 +13,7 @@ public sealed class OutboxOrigin
 
     public bool IsDeployed => Value.Length == 0;
 
+    /// <summary>The only resolver of the effective task queue suffix; the outbox Temporal transport uses it too.</summary>
     public static OutboxOrigin FromServices(IServiceProvider services)
     {
         var fromOptions = services.GetService<IOptions<TemporalOptions>>()?.Value.TaskQueueSuffix;

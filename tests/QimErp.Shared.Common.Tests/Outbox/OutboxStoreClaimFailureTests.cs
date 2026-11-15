@@ -19,7 +19,7 @@ public class OutboxStoreClaimFailureTests
             .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused")
             .AddInterceptors(interceptor).Options;
         await using var db = new ClaimContext(options);
-        var store = new OutboxStore(db, NullLogger<OutboxStore>.Instance);
+        var store = new OutboxStore(db, NullLogger<OutboxStore>.Instance, null, OutboxOrigin.Deployed);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             store.ClaimAsync("test-node", 10, TimeSpan.FromSeconds(30), CancellationToken.None));

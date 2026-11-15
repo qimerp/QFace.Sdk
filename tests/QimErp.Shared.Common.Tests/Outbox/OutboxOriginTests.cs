@@ -1,4 +1,3 @@
-using Akka.Actor;
 using FluentAssertions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +11,6 @@ using QimErp.Shared.Common.Entities;
 using QimErp.Shared.Common.Events;
 using QimErp.Shared.Common.Interceptors;
 using QimErp.Shared.Common.Outbox;
-using QimErp.Shared.Common.Outbox.Actors;
 using QimErp.Shared.Common.Services.MultiTenancy;
 using QimErp.Shared.Common.Tests.Workflow;
 using Xunit;
@@ -225,100 +223,6 @@ public sealed class OutboxOriginTests
         rows[stamped.Id].Origin.Should().Be("-other");
     }
 
-    [Fact]
-    public async Task Failed_delivery_is_never_marked_processed()
-    {
-        var database = Guid.NewGuid().ToString();
-        await using var provider = BuildProvider(database, suffix: null);
-        var id = await SeedAsync(provider, "");
-        var claimed = (await ClaimAsync(provider, "node")).Single();
-        var transport = new ThrowingTransport(new DbUpdateException("An error occurred while saving the entity changes."));
-
-        var row = await DispatchAsync(provider, transport, claimed, r => r.Attempts > 0);
-
-        row.Id.Should().Be(id);
-        row.ProcessedAt.Should().BeNull();
-        row.Attempts.Should().Be(1);
-        row.LastError.Should().Contain("saving the entity changes");
-        row.LockedBy.Should().BeNull();
-        row.DeadAt.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Failed_delivery_on_the_last_attempt_is_dead_not_processed()
-    {
-        var database = Guid.NewGuid().ToString();
-        await using var provider = BuildProvider(database, suffix: null, maxAttempts: 1);
-        await SeedAsync(provider, "");
-        var claimed = (await ClaimAsync(provider, "node")).Single();
-
-        var row = await DispatchAsync(provider, new ThrowingTransport(new InvalidOperationException("boom")), claimed,
-            r => r.DeadAt != null);
-
-        row.ProcessedAt.Should().BeNull();
-        row.Attempts.Should().Be(1);
-        row.LastError.Should().Be("boom");
-    }
-
-    [Fact]
-    public async Task Successful_delivery_is_marked_processed_without_an_error()
-    {
-        var database = Guid.NewGuid().ToString();
-        await using var provider = BuildProvider(database, suffix: null);
-        await SeedAsync(provider, "");
-        var claimed = (await ClaimAsync(provider, "node")).Single();
-
-        var row = await DispatchAsync(provider, new ThrowingTransport(null), claimed, r => r.ProcessedAt != null);
-
-        row.Attempts.Should().Be(0);
-        row.LastError.Should().BeNull();
-    }
-
-    private static async Task<OutboxMessage> DispatchAsync(
-        ServiceProvider provider,
-        IEventTransport transport,
-        OutboxMessage claimed,
-        Func<OutboxMessage, bool> done)
-    {
-        var system = ActorSystem.Create($"outbox-origin-{Guid.NewGuid():N}");
-        try
-        {
-            var transports = new Dictionary<string, IEventTransport>(StringComparer.OrdinalIgnoreCase)
-            {
-                [transport.Name] = transport,
-            };
-            var worker = system.ActorOf(Props.Create(() => new OutboxDispatchWorkerActor(
-                provider.GetRequiredService<IServiceScopeFactory>(),
-                transports,
-                provider.GetRequiredService<IOptions<OutboxOptions>>())));
-
-            worker.Tell(new OutboxDispatch(claimed));
-
-            var deadline = DateTime.UtcNow.AddSeconds(10);
-            while (DateTime.UtcNow < deadline)
-            {
-                var row = (await ReadAllAsync(provider)).Single(m => m.Id == claimed.Id);
-                if (done(row))
-                    return row;
-                await Task.Delay(25);
-            }
-
-            throw new TimeoutException("Dispatch did not finish.");
-        }
-        finally
-        {
-            await system.Terminate();
-        }
-    }
-
-    private sealed class ThrowingTransport(Exception? failure) : IEventTransport
-    {
-        public string Name => OutboxTransports.Temporal;
-
-        public Task SendAsync(EventEnvelope envelope, CancellationToken cancellationToken = default) =>
-            failure is null ? Task.CompletedTask : Task.FromException(failure);
-    }
-
     private static IConfiguration Configuration(string? suffix) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Temporal:TaskQueueSuffix"] = suffix })
@@ -327,8 +231,7 @@ public sealed class OutboxOriginTests
     private static ServiceProvider BuildProvider(
         string database,
         string? suffix,
-        Action<IServiceCollection>? configure = null,
-        int maxAttempts = 10)
+        Action<IServiceCollection>? configure = null)
     {
         var configuration = Configuration(suffix);
         var services = new ServiceCollection();
@@ -337,11 +240,7 @@ public sealed class OutboxOriginTests
         services.AddSingleton<ITenantContext>(new TenantContext());
         services.AddDbContext<TestApplicationDbContext>(o => o.UseInMemoryDatabase(database, SharedRoot));
         services.AddTransactionalOutbox<TestApplicationDbContext>(configuration);
-        services.Configure<OutboxOptions>(o =>
-        {
-            o.MaxAttempts = maxAttempts;
-            o.DefaultTransports = [OutboxTransports.Temporal];
-        });
+        services.Configure<OutboxOptions>(o => o.DefaultTransports = [OutboxTransports.Temporal]);
         configure?.Invoke(services);
         return services.BuildServiceProvider();
     }

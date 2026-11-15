@@ -57,6 +57,9 @@ public static class OutboxServiceCollectionExtensions
                 sp.GetRequiredService<IOutboxEventTypeResolver>(),
                 sp.GetServices<OutboxEventTypeRegistration>()));
 
+        if (!services.Any(d => d.ImplementationType == typeof(OutboxSchemaStartupCheck<TContext>)))
+            services.AddHostedService<OutboxSchemaStartupCheck<TContext>>();
+
         if (!services.Any(d => d.ImplementationType == typeof(OutboxRelayHostedService)))
             services.AddHostedService<OutboxRelayHostedService>();
 
