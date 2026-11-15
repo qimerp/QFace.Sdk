@@ -4,7 +4,7 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "17c1ea07cb493716cf62e8617780eee016a9470638db30171b5f7b1a4f512734";
+    public const string ContractRevision = "2b1ddab321bade49bad8b8ab9ace8bcbddd0642c84da10b7eb2a360972d7b22d";
 
     public static class Auth
     {
@@ -46,9 +46,24 @@ public static class NotificationIntents
             public const string Key = "people.hr_message.sent";
             public const int V1 = 1;
         }
+        public static class LeaveCoverAssigned
+        {
+            public const string Key = "people.leave_cover.assigned";
+            public const int V1 = 1;
+        }
         public static class LeavePlanNudged
         {
             public const string Key = "people.leave_plan.nudged";
+            public const int V1 = 1;
+        }
+        public static class LeaveRequestDecided
+        {
+            public const string Key = "people.leave_request.decided";
+            public const int V1 = 1;
+        }
+        public static class LeaveRequestSubmitted
+        {
+            public const string Key = "people.leave_request.submitted";
             public const int V1 = 1;
         }
         public static class NewsPublished
@@ -89,6 +104,16 @@ public static class NotificationIntents
         public static class RetirementNoticeDue
         {
             public const string Key = "people.retirement.notice_due";
+            public const int V1 = 1;
+        }
+        public static class SurveyInvited
+        {
+            public const string Key = "people.survey.invited";
+            public const int V1 = 1;
+        }
+        public static class SurveyReminded
+        {
+            public const string Key = "people.survey.reminded";
             public const int V1 = 1;
         }
         public static class WorkAnniversaryToday
