@@ -30,6 +30,11 @@ public sealed class HealthCheckLogFilterTests
         LoggingExtensions.IsHealthCheckNoise(Event(LogEventLevel.Information, "RequestPath", path), Paths).Should().BeFalse();
 
     [Fact]
+    public void Blank_configured_path_matches_nothing() =>
+        LoggingExtensions.IsHealthCheckNoise(Event(LogEventLevel.Information, "RequestPath", "/api/hr/employees"), new[] { "", " " })
+            .Should().BeFalse();
+
+    [Fact]
     public void Keeps_probe_failures() =>
         LoggingExtensions.IsHealthCheckNoise(Event(LogEventLevel.Error, "RequestPath", "/ready"), Paths).Should().BeFalse();
 

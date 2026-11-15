@@ -104,6 +104,7 @@ public static class LoggingExtensions
         }
 
         private static bool IsSameOrChildPath(string path, string root) =>
-            path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            !string.IsNullOrWhiteSpace(root)
+            && path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
             && (path.Length == root.Length || path[root.Length] is '/' or '?');
     }
