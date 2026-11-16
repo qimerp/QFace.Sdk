@@ -40,6 +40,9 @@ public class OutboxMessage
 
     public DateTimeOffset? DeadAt { get; set; }
 
+    /// <summary>Writer's Temporal task queue suffix: empty = deployed; null = written before origin stamping, claimed only by the deployed relay.</summary>
+    public string? Origin { get; set; }
+
     /// <summary>Compatibility shim for the pre-DATA-09 shape. Prefer <see cref="ProcessedAt"/>.</summary>
     [Obsolete("Use ProcessedAt. Kept for source compatibility with early OutboxMessage drafts.")]
     public bool IsProcessed

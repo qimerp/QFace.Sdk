@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -84,6 +85,30 @@ public class TemporalEventTransportTests
         starts[0].Id.Should().Be(starts[5].Id);
         starts.Should().OnlyContain(o => o.IdReusePolicy == WorkflowIdReusePolicy.RejectDuplicate
             && o.IdConflictPolicy == WorkflowIdConflictPolicy.UseExisting);
+    }
+
+    [Theory]
+    [InlineData("-local", "people-local")]
+    [InlineData("", "people")]
+    public async Task Task_queue_suffix_is_the_registered_outbox_origin(string origin, string expectedQueue)
+    {
+        var starts = new List<WorkflowOptions>();
+        var client = new Mock<ITemporalClient>();
+        client.Setup(c => c.StartWorkflowAsync(It.IsAny<string>(), It.IsAny<IReadOnlyCollection<object>>(), It.IsAny<WorkflowOptions>()))
+            .Callback<string, IReadOnlyCollection<object>, WorkflowOptions>((_, _, options) => starts.Add(options))
+            .ReturnsAsync((WorkflowHandle)null!);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Temporal:TaskQueueSuffix"] = "-from-config" })
+            .Build();
+        using var provider = new ServiceCollection()
+            .AddSingleton(client.Object)
+            .AddSingleton<IConfiguration>(configuration)
+            .AddSingleton(new OutboxOrigin(origin))
+            .BuildServiceProvider();
+
+        await CreateTransport(provider).SendAsync(Envelope("tenant-a", Guid.CreateVersion7(), Guid.CreateVersion7()));
+
+        starts.Should().ContainSingle().Which.TaskQueue.Should().Be(expectedQueue);
     }
 
     [Theory]

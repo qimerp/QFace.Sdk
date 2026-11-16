@@ -23,6 +23,7 @@ using QimErp.Shared.Common.Behaviours;
 using QimErp.Shared.Common.Database;
 using QimErp.Shared.Common.Integrations.GoogleWorkspace;
 using QimErp.Shared.Common.Integrations.Microsoft365;
+using QimErp.Shared.Common.Logging;
 using QimErp.Shared.Common.Middlewares;
 using QimErp.Shared.Common.Services.AI;
 using QimErp.Shared.Common.Services.Knowledge;
@@ -89,6 +90,7 @@ public static class SharedServiceCollectionExtensions
             cfg.RegisterServicesFromAssemblies(allCurrentAssemblies);
         });
 
+        services.TryAddScoped<AnonymousRequestContext>();
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehaviour<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TracingBehaviour<,>));
 
@@ -454,6 +456,8 @@ public static class SharedServiceCollectionExtensions
         services.AddScoped<IDistributedCacheService, RedisCacheService>();
         services.AddScoped<ICacheService, RedisCacheService>();
         services.AddScoped<ISharedDistributedCacheService, SharedRedisCacheService>();
+        if (!configuration.GetValue("RedisCache:Enabled", true))
+            services.AddHostedService<RedisCacheDisabledStartupCheck>();
         services.AddHttpClient("microsoft365-graph");
         services.AddHttpClient("microsoft365-token");
         services.AddScoped<IMicrosoft365GraphClient, Microsoft365GraphClient>();
@@ -824,7 +828,8 @@ public static class SharedServiceCollectionExtensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter(WorkflowApprovalGateMetrics.MeterName);
             })
             .WithTracing(tracing =>
             {

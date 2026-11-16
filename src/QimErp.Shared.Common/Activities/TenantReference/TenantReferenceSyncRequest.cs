@@ -61,6 +61,7 @@ public class TenantReferenceSyncRequest
     public string? HolidayType { get; set; }
     public string? HolidayCountryCode { get; set; }
     public string? HolidayRegion { get; set; }
+    public string? HolidayDescription { get; set; }
     public bool IsRecurring { get; set; }
     public bool IsActive { get; set; }
 

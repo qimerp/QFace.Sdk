@@ -58,6 +58,45 @@ public class NotificationIntentsDriftTests
     }
 
     [Fact]
+    public void Lock_CarriesAll50Contracts_IncludingLegacySenderIntents()
+    {
+        NotificationIntentLock.Contracts.Should().HaveCount(50);
+        NotificationIntentLock.Contracts.Keys.Should().Contain(
+        [
+            NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestSubmitted.Key, NotificationIntents.People.LeaveRequestSubmitted.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestDecided.Key, NotificationIntents.People.LeaveRequestDecided.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.LeaveCoverAssigned.Key, NotificationIntents.People.LeaveCoverAssigned.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.SurveyInvited.Key, NotificationIntents.People.SurveyInvited.V1),
+            NotificationIntentLock.Identity(NotificationIntents.People.SurveyReminded.Key, NotificationIntents.People.SurveyReminded.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Workflow.RequestStarted.Key, NotificationIntents.Workflow.RequestStarted.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Workflow.RequestStageAdvanced.Key, NotificationIntents.Workflow.RequestStageAdvanced.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Workflow.RequestApproved.Key, NotificationIntents.Workflow.RequestApproved.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Workflow.RequestRejected.Key, NotificationIntents.Workflow.RequestRejected.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Workflow.RequestReturned.Key, NotificationIntents.Workflow.RequestReturned.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Workflow.ApprovalOverdue.Key, NotificationIntents.Workflow.ApprovalOverdue.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Auth.AccountActivationRequested.Key, NotificationIntents.Auth.AccountActivationRequested.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Tenant.OwnerActivationRequested.Key, NotificationIntents.Tenant.OwnerActivationRequested.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Tenant.WorkspaceRequestApproved.Key, NotificationIntents.Tenant.WorkspaceRequestApproved.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Tenant.WorkspaceRequestRejected.Key, NotificationIntents.Tenant.WorkspaceRequestRejected.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Tenant.WorkspaceReady.Key, NotificationIntents.Tenant.WorkspaceReady.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Auth.PasswordChanged.Key, NotificationIntents.Auth.PasswordChanged.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Auth.PasswordAdminReset.Key, NotificationIntents.Auth.PasswordAdminReset.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Auth.SignInSucceeded.Key, NotificationIntents.Auth.SignInSucceeded.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Auth.MfaSetupReminder.Key, NotificationIntents.Auth.MfaSetupReminder.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Iam.AccessReviewReminder.Key, NotificationIntents.Iam.AccessReviewReminder.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Iam.AuditFollowUpAssigned.Key, NotificationIntents.Iam.AuditFollowUpAssigned.V1),
+            NotificationIntentLock.Identity(NotificationIntents.AppStore.ItemInstalled.Key, NotificationIntents.AppStore.ItemInstalled.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Payroll.PayslipReady.Key, NotificationIntents.Payroll.PayslipReady.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Support.TicketReceived.Key, NotificationIntents.Support.TicketReceived.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Support.TicketReplied.Key, NotificationIntents.Support.TicketReplied.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Support.TicketResolved.Key, NotificationIntents.Support.TicketResolved.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Support.TicketAssigned.Key, NotificationIntents.Support.TicketAssigned.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Support.TicketQueued.Key, NotificationIntents.Support.TicketQueued.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Support.TicketSlaBreached.Key, NotificationIntents.Support.TicketSlaBreached.V1),
+        ]);
+    }
+
+    [Fact]
     public void Lock_IsLoadedFromTheEmbeddedResource()
     {
         typeof(NotificationIntentLock).Assembly.GetManifestResourceNames().Should().Contain(NotificationIntentLock.ResourceName);

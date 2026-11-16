@@ -48,12 +48,13 @@ public sealed class EntityCodeSettingsEndpoint : ICarterModule
     public void AddRoutes(IEndpointRouteBuilder app)
     {
         app.MapGet("/api/entity-codes", [Authorize] async (
+            string? module,
             IEntityCodeService codeService,
             ICurrentUserService currentUserService,
             CancellationToken ct) =>
         {
             var tenantId = currentUserService.GetTenantId() ?? string.Empty;
-            var configs = await codeService.GetAllConfigsAsync(tenantId, ct);
+            var configs = await codeService.GetConfigsForModuleAsync(tenantId, module, ct);
             var response = configs
                 .Select(c => ToResponse(c, codeService))
                 .OrderBy(c => c.EntityType, StringComparer.OrdinalIgnoreCase)
@@ -61,7 +62,7 @@ public sealed class EntityCodeSettingsEndpoint : ICarterModule
             return Result.WithSuccess(response).ToIResult();
         })
         .WithTags("EntityCodes")
-        .WithSummary("List this module's entity numbering configs for the current tenant");
+        .WithSummary("List this module's entity numbering configs for the current tenant, optionally filtered by ?module=");
 
         app.MapPut("/api/entity-codes/{entityType}", [Authorize] async (
             string entityType,

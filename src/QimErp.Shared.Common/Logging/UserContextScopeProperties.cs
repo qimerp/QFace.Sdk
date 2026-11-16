@@ -9,14 +9,6 @@ namespace QimErp.Shared.Common.Logging;
 // restricted here.
 internal static class UserContextScopeProperties
 {
-    public static List<KeyValuePair<string, object>> From(ICurrentUserService? user)
-    {
-        if (user == null)
-            return [];
-        var userId = user.GetUserId();
-        return From(user.GetTenantId(), userId);
-    }
-
     public static List<KeyValuePair<string, object>> From(
         string? tenantId,
         string? userEmail,
@@ -26,7 +18,7 @@ internal static class UserContextScopeProperties
         return From(tenantId, userId);
     }
 
-    private static List<KeyValuePair<string, object>> From(string? tenantId, string? userId)
+    public static List<KeyValuePair<string, object>> From(string? tenantId, string? userId)
     {
         var items = new List<KeyValuePair<string, object>>(2);
         if (!string.IsNullOrWhiteSpace(tenantId))
@@ -36,4 +28,19 @@ internal static class UserContextScopeProperties
             items.Add(new KeyValuePair<string, object>("UserId", userId));
         return items;
     }
+}
+
+internal sealed class UserContextScopeState(string? tenantId, string? userId, AnonymousRequestContext? anonymousRequest)
+    : IReadOnlyList<KeyValuePair<string, object>>
+{
+    private List<KeyValuePair<string, object>> Items =>
+        UserContextScopeProperties.From(tenantId, anonymousRequest?.IsAnonymous == true ? null : userId);
+
+    public int Count => Items.Count;
+
+    public KeyValuePair<string, object> this[int index] => Items[index];
+
+    public IEnumerator<KeyValuePair<string, object>> GetEnumerator() => Items.GetEnumerator();
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }

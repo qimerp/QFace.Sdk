@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "key": "support.ticket.assigned",
+  "version": 1,
+  "owner": {
+    "domain": "support",
+    "service": "QimErp.Operator"
+  },
+  "summary": "A support ticket was assigned to an agent.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "support_agent",
+      "recipient": {
+        "source": "platform",
+        "from": "recipientId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "recipientId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TicketNumber",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "TCK-0001"
+    },
+    {
+      "name": "TicketTitle",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Confidential",
+      "resolvedAt": "precheck",
+      "example": "Example ticket title"
+    },
+    {
+      "name": "ModuleName",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example module"
+    },
+    {
+      "name": "Priority",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "High"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://operator.example.qimerp.com/tickets/00000000-0000-4000-8000-000000000001",
+      "resolvedFrom": "operator.consoleUrl",
+      "url": {
+        "host": "operator-console",
+        "purpose": "operator_console"
+      }
+    }
+  ]
+}

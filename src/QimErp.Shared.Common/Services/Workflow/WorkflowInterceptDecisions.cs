@@ -15,7 +15,13 @@ public static class WorkflowInterceptDecisions
         entity.WorkflowStatus == WorkflowStatus.InProgress;
 
     public static bool ShouldStartCreateWorkflow(EntityWorkflowConfig config, IWorkflowEnabled entity) =>
-        config.EnableWorkflowForCreate
+        ConfigRequiresCreateApproval(config, entity);
+
+    /// <remarks>Without an entity the trigger conditions cannot be evaluated and are treated as met.</remarks>
+    public static bool ConfigRequiresCreateApproval(
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] EntityWorkflowConfig? config,
+        IWorkflowEnabled? entity) =>
+        config is { EnableWorkflowForCreate: true }
         && !string.IsNullOrWhiteSpace(config.CreateWorkflowCode)
-        && WorkflowTriggerConditionEvaluator.EvaluateAll(entity, config.CreateTriggerConditions);
+        && (entity is null || WorkflowTriggerConditionEvaluator.EvaluateAll(entity, config.CreateTriggerConditions));
 }

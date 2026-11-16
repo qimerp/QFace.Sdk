@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "key": "auth.account.activation_requested",
+  "version": 1,
+  "owner": {
+    "domain": "identity",
+    "service": "QimErp.Platform"
+  },
+  "summary": "An administrator created an account; the user sets a password through a single-use link.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "invited_user",
+      "recipient": {
+        "source": "platform",
+        "from": "userId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "userId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    },
+    {
+      "name": "emailLinkLookupId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Confidential"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "WorkspaceUrl",
+      "type": "hostname",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "workspace.example.qimerp.com",
+      "resolvedFrom": "tenant.workspaceHost"
+    },
+    {
+      "name": "LinkExpiresAt",
+      "type": "datetime",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "afterPrecheck",
+      "example": "2026-11-07T10:42:00Z",
+      "resolvedFrom": "link.expiresAt"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Sensitive",
+      "resolvedAt": "afterPrecheck",
+      "example": "https://app.example.qimerp.com/auth/activate?token=EXAMPLE",
+      "resolvedFrom": "link.url",
+      "url": {
+        "host": "platform-frontend",
+        "purpose": "account_activation",
+        "reference": "emailLinkLookupId",
+        "singleUse": true
+      }
+    }
+  ]
+}

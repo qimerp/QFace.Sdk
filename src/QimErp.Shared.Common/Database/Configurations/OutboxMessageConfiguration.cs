@@ -22,6 +22,10 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
             .HasDatabaseName("ix_outbox_ready")
             .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadAt\" IS NULL");
 
+        builder.HasIndex(x => new { x.Origin, x.NextAttemptAt })
+            .HasDatabaseName("ix_outbox_origin_ready")
+            .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadAt\" IS NULL");
+
         builder.HasIndex(x => new { x.EntityId, x.OccurredAt })
             .HasDatabaseName("ix_outbox_entity_order");
     }

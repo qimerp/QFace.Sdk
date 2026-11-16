@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Events;
 using Serilog.Sinks.Graylog;
 using Serilog.Sinks.Graylog.Core.Transport;
 
@@ -54,8 +55,12 @@ public static class LoggingExtensions
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {transportInfo}");
                 Console.Error.WriteLine($"[{DateTime.Now:HH:mm:ss}] {transportInfo}");
 
+                loggerConfig.MinimumLevel.Is(opts.MinimumLevel);
+                foreach (var (category, level) in opts.Overrides)
+                    loggerConfig.MinimumLevel.Override(category, level);
+
                 loggerConfig
-                    .MinimumLevel.Is(opts.MinimumLevel)
+                    .Filter.ByExcluding(e => IsHealthCheckNoise(e, opts.HealthCheckPaths))
                     .Enrich.FromLogContext()
                     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .WriteTo.Graylog(new GraylogSinkOptions
@@ -79,4 +84,27 @@ public static class LoggingExtensions
                 Console.Error.WriteLine($"Error configuring QFace logging: {ex.Message}");
             }
         }
+
+        private static readonly string[] RequestPathProperties = { "RequestPath", "Path", "PathAndQuery" };
+
+        internal static bool IsHealthCheckNoise(LogEvent logEvent, IReadOnlyCollection<string> healthCheckPaths)
+        {
+            if (logEvent.Level >= LogEventLevel.Warning || healthCheckPaths.Count == 0)
+                return false;
+
+            foreach (var name in RequestPathProperties)
+            {
+                if (logEvent.Properties.TryGetValue(name, out var value)
+                    && value is ScalarValue { Value: string path }
+                    && healthCheckPaths.Any(p => IsSameOrChildPath(path, p)))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsSameOrChildPath(string path, string root) =>
+            !string.IsNullOrWhiteSpace(root)
+            && path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            && (path.Length == root.Length || path[root.Length] is '/' or '?');
     }
