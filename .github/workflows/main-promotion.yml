@@ -36,9 +36,9 @@ jobs:
           fi
           echo "Refusing $SOURCE $HEAD -> main"
           gh pr close "$PR" --repo "$TARGET" --comment "$(cat <<EOF
-          main only accepts pull requests from \`development\` or a \`hotfix/*\` branch in this repository.
+          main only accepts pull requests from \`staging\` or a \`hotfix/*\` branch in this repository.
 
-          This pull request is from \`$HEAD\` (\`$SOURCE\`). Open it against development, or use a \`hotfix/*\` branch for a production fix.
+          This pull request is from \`$HEAD\` (\`$SOURCE\`). Open it against staging, or use a \`hotfix/*\` branch for a production fix.
           EOF
           )"
           exit 1
