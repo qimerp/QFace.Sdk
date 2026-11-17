@@ -15,7 +15,7 @@ jobs:
     runs-on: [self-hosted, qimerp-ci-gate]
     timeout-minutes: 5
     steps:
-      - name: Allow only staging or a hotfix into main
+      - name: Allow only development or a hotfix into main
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD: ${{ github.head_ref }}
@@ -27,7 +27,7 @@ jobs:
           allowed=0
           if [ -n "$SOURCE" ] && [ "$SOURCE" = "$TARGET" ]; then
             case "$HEAD" in
-              staging|hotfix|hotfix/*|hotfix-*) allowed=1 ;;
+              development|hotfix|hotfix/*|hotfix-*) allowed=1 ;;
             esac
           fi
           if [ "$allowed" -eq 1 ]; then
@@ -36,9 +36,9 @@ jobs:
           fi
           echo "Refusing $SOURCE $HEAD -> main"
           gh pr close "$PR" --repo "$TARGET" --comment "$(cat <<EOF
-          main only accepts pull requests from \`staging\` or a \`hotfix/*\` branch in this repository.
+          main only accepts pull requests from \`development\` or a \`hotfix/*\` branch in this repository.
 
-          This pull request is from \`$HEAD\` (\`$SOURCE\`). Open it against staging, or use a \`hotfix/*\` branch for a production fix.
+          This pull request is from \`$HEAD\` (\`$SOURCE\`). Open it from development, or use a \`hotfix/*\` branch for a production fix.
           EOF
           )"
           exit 1
