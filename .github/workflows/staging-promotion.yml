@@ -1,0 +1,44 @@
+name: Staging promotion
+
+on:
+  pull_request:
+    branches: [staging]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  staging-promotion:
+    name: staging-promotion
+    runs-on: [self-hosted, qimerp-ci-gate]
+    timeout-minutes: 5
+    steps:
+      - name: Allow only development into staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ github.head_ref }}
+          SOURCE: ${{ github.event.pull_request.head.repo.full_name }}
+          TARGET: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -eu
+          allowed=0
+          if [ -n "$SOURCE" ] && [ "$SOURCE" = "$TARGET" ]; then
+            case "$HEAD" in
+              development) allowed=1 ;;
+            esac
+          fi
+          if [ "$allowed" -eq 1 ]; then
+            echo "Allowed: $SOURCE $HEAD -> staging"
+            exit 0
+          fi
+          echo "Refusing $SOURCE $HEAD -> staging"
+          gh pr close "$PR" --repo "$TARGET" --comment "$(cat <<EOF
+          staging only accepts pull requests from \`development\` in this repository.
+
+          This pull request is from \`$HEAD\` (\`$SOURCE\`).
+          EOF
+          )"
+          exit 1
