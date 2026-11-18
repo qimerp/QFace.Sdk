@@ -3,9 +3,9 @@ name: PR Validation — QFace.Sdk
 on:
   workflow_dispatch:
   push:
-    branches: [development, main]
+    branches: [main]
   pull_request:
-    branches: [development, main]
+    branches: [main]
     paths:
       - "src/**"
       - "tests/**"
