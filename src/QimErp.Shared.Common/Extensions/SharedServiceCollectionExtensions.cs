@@ -460,7 +460,8 @@ public static class SharedServiceCollectionExtensions
             services.AddHostedService<RedisCacheDisabledStartupCheck>();
         services.AddHttpClient("microsoft365-graph");
         services.AddHttpClient("microsoft365-token");
-        services.AddHttpClient("microsoft365-catalog", client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient("microsoft365-catalog", client => client.Timeout = TimeSpan.FromSeconds(20))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddOptions<Microsoft365CatalogOptions>()
             .Bind(configuration.GetSection(Microsoft365CatalogOptions.SectionName));
         services.TryAddSingleton(TimeProvider.System);

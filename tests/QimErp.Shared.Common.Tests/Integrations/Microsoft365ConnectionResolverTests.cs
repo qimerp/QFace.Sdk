@@ -84,6 +84,21 @@ public sealed class Microsoft365ConnectionResolverTests
         harness.RequestCount.Should().Be(1);
     }
 
+    [Fact]
+    public async Task HydrationRedirect_IsUnavailableWithoutFollowingTheTarget()
+    {
+        var harness = new Harness();
+        harness.OnRequest = _ => new HttpResponseMessage(HttpStatusCode.Redirect)
+        {
+            Headers = { Location = new Uri("https://untrusted.example/catalog") }
+        };
+
+        var result = await harness.Resolver.ResolveAsync(Tenant, Company);
+
+        result.Status.Should().Be(Microsoft365ConnectionStatus.Unavailable);
+        harness.RequestCount.Should().Be(1);
+    }
+
     [Theory]
     [InlineData("missing")]
     [InlineData("expired")]
