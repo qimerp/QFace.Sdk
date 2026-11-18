@@ -33,12 +33,14 @@ public sealed class Microsoft365OofResult
 
 public interface IMicrosoft365GraphClient
 {
-    Task<TenantMicrosoft365ResolvedOptions?> GetTenantOptionsAsync(
+    Task<Microsoft365ConnectionResolution> ResolveConnectionAsync(
         string tenantId,
+        string companyId,
         CancellationToken cancellationToken = default);
 
     Task<Microsoft365OnlineMeetingResult> TryCreateOnlineMeetingAsync(
         string tenantId,
+        string companyId,
         string subject,
         DateTime startUtc,
         DateTime endUtc,
@@ -47,6 +49,7 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365OofResult> TrySetAutomaticRepliesAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtc,
@@ -57,6 +60,7 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365OofResult> TryUpsertLeaveCalendarEventAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         string subject,
         DateTime startUtc,
@@ -67,6 +71,7 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365OofResult> TrySetLeavePresenceAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtcExclusive,

@@ -430,20 +430,33 @@ public class AuditEntitySaveChangesInterceptor(
 
     private void SetCompanyIdOnEntities(DbContext context)
     {
+        var scope = CompanyContext.CurrentScope;
+        foreach (var entry in context.ChangeTracker.Entries<AppSetting>()
+                     .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                                 && (e.Entity.Scope == AppSettingScope.TenantOnly
+                                     || e.Property(x => x.Scope).OriginalValue == AppSettingScope.TenantOnly)))
+        {
+            if (!scope.IsTenantWideWriter)
+                throw new AppSettingScopeViolationException("Tenant-only settings require tenant-wide write access.");
+
+            if (entry.Entity.IsGlobal || string.IsNullOrWhiteSpace(entry.Entity.TenantId)
+                                      || !string.IsNullOrEmpty(entry.Entity.CompanyId))
+                throw new AppSettingScopeViolationException("Tenant-only settings must belong to a tenant and have no company owner.");
+        }
+
         // "" is tenant-shared, not unset — an edit must never convert a shared row to company-owned.
         var entriesToStamp = context.ChangeTracker.Entries<AuditableEntity>()
             .Where(e => e.State is EntityState.Added
                         && string.IsNullOrWhiteSpace(e.Entity.CompanyId)
                         && !e.Entity.IsGlobal
-                        && e.Entity is not ITenantWideEntity)
+                        && e.Entity is not ITenantWideEntity
+                        && e.Entity is not AppSetting { Scope: AppSettingScope.TenantOnly })
             .ToList();
 
         if (entriesToStamp.Count == 0)
         {
             return;
         }
-
-        var scope = CompanyContext.CurrentScope;
 
         // Flag off must never throw: every row is tenant-shared, exactly as before multi-company.
         if (!scope.MultiCompanyEnabled)

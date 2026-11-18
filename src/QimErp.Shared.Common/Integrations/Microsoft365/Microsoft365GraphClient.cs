@@ -3,14 +3,14 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
-using QimErp.Shared.Common.Constants;
-using QimErp.Shared.Common.Services.Cache;
+using QimErp.Shared.Common.Services.MultiTenancy;
 
 namespace QimErp.Shared.Common.Integrations.Microsoft365;
 
 public sealed class Microsoft365GraphClient(
-    ISharedDistributedCacheService cache,
+    Microsoft365ConnectionResolver connectionResolver,
     IHttpClientFactory httpClientFactory,
     ILogger<Microsoft365GraphClient> logger) : IMicrosoft365GraphClient
 {
@@ -20,20 +20,25 @@ public sealed class Microsoft365GraphClient(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public Task<TenantMicrosoft365ResolvedOptions?> GetTenantOptionsAsync(
+    public Task<Microsoft365ConnectionResolution> ResolveConnectionAsync(
         string tenantId,
+        string companyId,
         CancellationToken cancellationToken = default) =>
-        cache.GetAsync<TenantMicrosoft365ResolvedOptions>(SharedCacheKeys.TenantMicrosoft365Config(tenantId));
+        connectionResolver.ResolveAsync(tenantId, companyId, cancellationToken);
 
     public async Task<Microsoft365OnlineMeetingResult> TryCreateOnlineMeetingAsync(
         string tenantId,
+        string companyId,
         string subject,
         DateTime startUtc,
         DateTime endUtc,
         string organizerUserPrincipalName,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OnlineMeetingResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableTeamsMeetingOnCompanyEvents)
         {
             return new Microsoft365OnlineMeetingResult
@@ -119,6 +124,7 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365OofResult> TrySetAutomaticRepliesAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtc,
@@ -127,7 +133,10 @@ public sealed class Microsoft365GraphClient(
         bool clear,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OofResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableOutlookOofOnLeave)
         {
             return new Microsoft365OofResult { Succeeded = true, Skipped = true };
@@ -215,6 +224,7 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365OofResult> TryUpsertLeaveCalendarEventAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         string subject,
         DateTime startUtc,
@@ -223,7 +233,10 @@ public sealed class Microsoft365GraphClient(
         bool clear,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OofResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableCalendarBlockOnLeave)
         {
             return new Microsoft365OofResult { Succeeded = true, Skipped = true };
@@ -253,7 +266,8 @@ public sealed class Microsoft365GraphClient(
             using var client = httpClientFactory.CreateClient("microsoft365-graph");
             var iCalUId = string.IsNullOrWhiteSpace(transactionId)
                 ? null
-                : $"qimerp-leave-{transactionId}";
+                : "qimerp-leave-" + Convert.ToHexString(SHA256.HashData(
+                    Encoding.UTF8.GetBytes(string.Join('\n', tenantId, CompanyIdNormalizer.Normalize(companyId), transactionId))));
 
             if (clear)
             {
@@ -355,13 +369,17 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365OofResult> TrySetLeavePresenceAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtcExclusive,
         bool clear,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OofResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableTeamsPresenceOnLeave)
         {
             return new Microsoft365OofResult { Succeeded = true, Skipped = true };
