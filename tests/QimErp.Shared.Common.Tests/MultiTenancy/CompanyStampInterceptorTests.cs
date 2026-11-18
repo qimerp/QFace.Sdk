@@ -30,6 +30,7 @@ public sealed class CompanyStampInterceptorTests : IDisposable
         public DbSet<EntityCodeConfig> Configs { get; set; } = null!;
         public DbSet<TenantWideRow> TenantWideRows { get; set; } = null!;
         public DbSet<TenantPluginFlag> TenantPluginFlags { get; set; } = null!;
+        public DbSet<AppSetting> Settings { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -38,6 +39,8 @@ public sealed class CompanyStampInterceptorTests : IDisposable
             modelBuilder.Entity<EntityCodeReservation>().Ignore(e => e.CustomFields);
             modelBuilder.Entity<TenantWideRow>().Ignore(e => e.CustomFields);
             modelBuilder.Entity<TenantPluginFlag>().Ignore(e => e.CustomFields);
+            modelBuilder.ApplyConfiguration(new QimErp.Shared.Common.Database.Configurations.AppSettingConfiguration());
+            modelBuilder.Entity<AppSetting>().Ignore(e => e.CustomFields);
         }
     }
 
@@ -108,6 +111,100 @@ public sealed class CompanyStampInterceptorTests : IDisposable
             _scope.Dispose();
             _root.Dispose();
         }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(CompanyA)]
+    public async Task TenantOnlySetting_IsSharedAcrossTenantWideCompanySelections(string? active)
+    {
+        using var harness = new Harness();
+        var scope = CompanyScope.AllCompanies(active);
+        SetScope(scope);
+        var setting = AppSetting.Create("integration", "encrypted", "Microsoft365");
+        setting.WithScope(AppSettingScope.TenantOnly);
+        harness.Db.Settings.Add(setting);
+
+        await harness.Db.SaveChangesAsync();
+
+        setting.CompanyId.Should().BeEmpty();
+        setting.TenantId.Should().Be(Tenant);
+        setting.IsGlobal.Should().BeFalse();
+        CompanyContext.CurrentScope.Should().BeSameAs(scope);
+        setting.UpdateValue("updated");
+        await harness.Db.SaveChangesAsync();
+        setting.CompanyId.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("add", null)]
+    [InlineData("update", null)]
+    [InlineData("delete", null)]
+    [InlineData("demote", null)]
+    [InlineData("add", CompanyA)]
+    [InlineData("update", CompanyA)]
+    [InlineData("delete", CompanyA)]
+    [InlineData("demote", CompanyA)]
+    public async Task TenantOnlySetting_RejectsRestrictedCompanyWriter(string operation, string? active)
+    {
+        using var harness = new Harness();
+        SetScope(CompanyScope.Inactive);
+        var setting = AppSetting.Create("integration", "encrypted", "Microsoft365");
+        setting.WithScope(AppSettingScope.TenantOnly);
+        harness.Db.Settings.Add(setting);
+        if (operation != "add")
+            await harness.Db.SaveChangesAsync();
+        SetScope(CompanyScope.ForCompanies([CompanyA, CompanyB], active));
+        if (operation == "update") setting.UpdateValue("changed");
+        if (operation == "delete") harness.Db.Settings.Remove(setting);
+        if (operation == "demote") setting.WithScope(AppSettingScope.CompanyOverridable);
+
+        var save = () => harness.Db.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<AppSettingScopeViolationException>();
+    }
+
+    [Fact]
+    public async Task TenantOnlySetting_RejectsCompanyOwnedRecord()
+    {
+        using var harness = new Harness();
+        SetScope(CompanyScope.AllCompanies(CompanyA));
+        var setting = AppSetting.Create("integration", "encrypted", "Microsoft365");
+        setting.WithScope(AppSettingScope.TenantOnly).WithCompanyId(CompanyA);
+        harness.Db.Settings.Add(setting);
+
+        var save = () => harness.Db.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<AppSettingScopeViolationException>();
+    }
+
+    [Fact]
+    public async Task TenantOnlySetting_RejectsGlobalRecord()
+    {
+        using var harness = new Harness();
+        SetScope(CompanyScope.AllCompanies(null));
+        var setting = AppSetting.Create("integration", "encrypted", "Microsoft365");
+        setting.WithScope(AppSettingScope.TenantOnly);
+        setting.EnableGlobal();
+        harness.Db.Settings.Add(setting);
+
+        var save = () => harness.Db.SaveChangesAsync();
+
+        await save.Should().ThrowAsync<AppSettingScopeViolationException>();
+    }
+
+    [Fact]
+    public async Task CompanyOverridableSetting_PreservesActiveCompanyStamp()
+    {
+        using var harness = new Harness();
+        SetScope(CompanyScope.ForCompanies([CompanyA, CompanyB], CompanyA));
+        var setting = AppSetting.Create("company.setting", "value", "Company");
+        harness.Db.Settings.Add(setting);
+
+        await harness.Db.SaveChangesAsync();
+
+        setting.CompanyId.Should().Be(CompanyA);
+        setting.Scope.Should().Be(AppSettingScope.CompanyOverridable);
     }
 
     private static void SetScope(CompanyScope scope) => new CompanyContext().SetScope(scope);
