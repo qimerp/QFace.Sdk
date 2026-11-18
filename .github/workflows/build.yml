@@ -2,10 +2,10 @@ name: Build and Publish NuGet Packages
 
 on:
   push:
-    branches: [main]
+    branches: [staging, main]
     tags: ["v*.*.*"]
   pull_request:
-    branches: [main]
+    branches: [staging, main]
   workflow_dispatch:
 
 jobs:
