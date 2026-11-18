@@ -1,3 +1,4 @@
+using QimErp.Shared.Common.AppSettings.Authorization;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Runtime.CompilerServices;
@@ -432,11 +433,35 @@ public class AuditEntitySaveChangesInterceptor(
     {
         var scope = CompanyContext.CurrentScope;
         foreach (var entry in context.ChangeTracker.Entries<AppSetting>()
+                     .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
+        {
+            if (AppSettingMetadataScopeExecutor.CurrentTenantId.Length == 0) continue;
+            var row = entry.Entity;
+            if (!AppSettingMetadataScopeExecutor.CanWrite(row.TenantId, row.CompanyId, row.Key, row.Category, row.Scope, row.IsGlobal))
+                throw new AppSettingScopeViolationException("The settings metadata operation cannot write this row.");
+            var scopeUpgrade = entry.State == EntityState.Modified && row.CompanyId.Length == 0
+                && (row.Key is "microsoft365.graph_config" or "microsoft365.sign_in_binding")
+                && row.Scope == AppSettingScope.TenantOnly
+                && entry.Property(x => x.Scope).OriginalValue == AppSettingScope.CompanyOverridable;
+            if (entry.State is EntityState.Modified or EntityState.Deleted
+                && (!AppSettingMetadataScopeExecutor.CanWrite(entry.Property(x => x.TenantId).OriginalValue,
+                    entry.Property(x => x.CompanyId).OriginalValue, entry.Property(x => x.Key).OriginalValue,
+                    entry.Property(x => x.Category).OriginalValue, scopeUpgrade ? AppSettingScope.TenantOnly : entry.Property(x => x.Scope).OriginalValue,
+                    entry.Property(x => x.IsGlobal).OriginalValue)
+                    || row.TenantId != entry.Property(x => x.TenantId).OriginalValue
+                    || row.CompanyId != entry.Property(x => x.CompanyId).OriginalValue
+                    || row.Key != entry.Property(x => x.Key).OriginalValue
+                    || row.Category != entry.Property(x => x.Category).OriginalValue
+                    || (!scopeUpgrade && row.Scope != entry.Property(x => x.Scope).OriginalValue)))
+                throw new AppSettingScopeViolationException("Settings metadata ownership cannot change.");
+        }
+        foreach (var entry in context.ChangeTracker.Entries<AppSetting>()
                      .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
                                  && (e.Entity.Scope == AppSettingScope.TenantOnly
                                      || e.Property(x => x.Scope).OriginalValue == AppSettingScope.TenantOnly)))
         {
-            if (!scope.IsTenantWideWriter)
+            if (!scope.IsTenantWideWriter && !AppSettingMetadataScopeExecutor.CanWrite(entry.Entity.TenantId,
+                    entry.Entity.CompanyId, entry.Entity.Key, entry.Entity.Category, entry.Entity.Scope, entry.Entity.IsGlobal))
                 throw new AppSettingScopeViolationException("Tenant-only settings require tenant-wide write access.");
 
             if (entry.Entity.IsGlobal || string.IsNullOrWhiteSpace(entry.Entity.TenantId)
@@ -450,7 +475,9 @@ public class AuditEntitySaveChangesInterceptor(
                         && string.IsNullOrWhiteSpace(e.Entity.CompanyId)
                         && !e.Entity.IsGlobal
                         && e.Entity is not ITenantWideEntity
-                        && e.Entity is not AppSetting { Scope: AppSettingScope.TenantOnly })
+                        && e.Entity is not AppSetting { Scope: AppSettingScope.TenantOnly }
+                        && !(e.Entity is AppSetting setting && AppSettingMetadataScopeExecutor.CanWrite(setting.TenantId,
+                            setting.CompanyId, setting.Key, setting.Category, setting.Scope, setting.IsGlobal)))
             .ToList();
 
         if (entriesToStamp.Count == 0)
@@ -587,6 +614,34 @@ public class AuditEntitySaveChangesInterceptor(
         GuardEmployeesHaveHomeCompany(blankedEmployees);
     }
 
+    private static bool IsAuthorizedSessionRevocation(DbContext context, Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<AuditableEntity> entry)
+    {
+        if (entry.Entity is not IIdentitySessionRevocationTarget session
+            || context is not IIdentitySessionRevocationWriteContext proof
+            || !AppSettingMetadataScopeExecutor.CanAuthorizeSessionRevocation(proof.RevocationTenantId, proof.RevocationTargetCompanyId))
+            return false;
+        if (entry.State != EntityState.Modified || proof.RevocationActorId != AppSettingMetadataScopeExecutor.CurrentActorId
+            || entry.Entity.TenantId != proof.RevocationTenantId || entry.Entity.IsGlobal
+            || session.IsActive || entry.Property(nameof(IIdentitySessionRevocationTarget.IsActive)).OriginalValue is not true
+            || entry.Properties.Where(p => p.IsModified).Any(p => p.Metadata.Name != nameof(IIdentitySessionRevocationTarget.IsActive)))
+            throw new CrossCompanyWriteException("The identity session revocation does not match its authorized operation.");
+        var key = entry.Metadata.FindPrimaryKey();
+        if (key is null || key.Properties.Count != 1 || key.Properties[0].ClrType != typeof(Guid))
+            throw new CrossCompanyWriteException("The identity session revocation target is invalid.");
+        var id = entry.Property(key.Properties[0].Name);
+        if (id.CurrentValue is not Guid sessionId || !Equals(id.CurrentValue, id.OriginalValue)
+            || !proof.RevocationSessionIds.Contains(sessionId.ToString(), StringComparer.Ordinal))
+            throw new CrossCompanyWriteException("The identity session is outside the authorized revocation set.");
+        foreach (var name in new[] { nameof(AuditableEntity.TenantId), nameof(AuditableEntity.CompanyId),
+                     nameof(AuditableEntity.IsGlobal), nameof(IIdentitySessionRevocationTarget.UserId) })
+        {
+            var property = entry.Property(name);
+            if (!Equals(property.CurrentValue, property.OriginalValue))
+                throw new CrossCompanyWriteException("Identity session ownership cannot change during revocation.");
+        }
+        return true;
+    }
+
     /// <remarks>
     /// <c>IgnoreQueryFilters()</c> + <c>AsNoTracking()</c> + <c>Update()</c> degrades this to a
     /// <c>CurrentValue</c> check, because EF holds no database snapshot to compare against.
@@ -608,6 +663,13 @@ public class AuditEntitySaveChangesInterceptor(
         foreach (var entry in entries)
         {
             if (entry.Metadata.FindProperty(nameof(AuditableEntity.CompanyId)) is null)
+                continue;
+
+            if (IsAuthorizedSessionRevocation(context, entry)) continue;
+
+            if (entry.Entity is AppSetting metadataSetting && AppSettingMetadataScopeExecutor.CanWrite(
+                    metadataSetting.TenantId, metadataSetting.CompanyId, metadataSetting.Key,
+                    metadataSetting.Category, metadataSetting.Scope, metadataSetting.IsGlobal))
                 continue;
 
             var entityTypeName = entry.Entity.GetType().Name;
