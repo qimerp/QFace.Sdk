@@ -105,7 +105,7 @@ public class SharedCacheKeyPrefixTests
     [InlineData(typeof(WorkflowConfigCacheService))]
     [InlineData(typeof(WorkflowDefinitionProvider))]
     [InlineData(typeof(WorkflowDefinitionCacheWriter))]
-    [InlineData(typeof(Microsoft365GraphClient))]
+    [InlineData(typeof(Microsoft365ConnectionResolver))]
     [InlineData(typeof(GoogleCalendarClient))]
     public void SharedKeyConsumers_DependOnSharedCacheOnly(Type consumer)
     {

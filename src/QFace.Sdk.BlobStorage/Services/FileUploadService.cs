@@ -184,9 +184,6 @@ public class FileUploadService : IFileUploadService
             // R2 rejects SigV2; force V4 immediately before signing (custom ServiceURL endpoints).
             Amazon.AWSConfigsS3.UseSignatureVersion4 = true;
 
-            // R2 rejects SigV2; force V4 immediately before signing (custom ServiceURL endpoints).
-            Amazon.AWSConfigsS3.UseSignatureVersion4 = true;
-
             var request = new GetPreSignedUrlRequest
             {
                 BucketName = _bucketName,

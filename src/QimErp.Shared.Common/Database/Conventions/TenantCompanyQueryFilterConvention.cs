@@ -1,3 +1,4 @@
+using QimErp.Shared.Common.AppSettings.Authorization;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
@@ -34,6 +35,19 @@ public sealed class TenantCompanyQueryFilterConvention(IScopedQueryFilterContext
 
             if (entityType.IsOwned() || entityType.BaseType is not null || entityType.FindPrimaryKey() is null)
                 continue;
+
+            if (entityType.ClrType == typeof(AppSetting) && context is IAppSettingMetadataQueryContext metadata)
+            {
+                var metadataFilter = BuildAppSettingFilter(metadata);
+                if (entityType.GetQueryFilter() is { } prior)
+                {
+                    var metadataParameter = metadataFilter.Parameters[0];
+                    var priorBody = new ParameterRebinder(prior.Parameters[0], metadataParameter).Visit(prior.Body)!;
+                    metadataFilter = Expression.Lambda(Expression.AndAlso(metadataFilter.Body, priorBody), metadataParameter);
+                }
+                SetFilter(entityType, metadataFilter);
+                continue;
+            }
 
             var tenantWide = typeof(ITenantWideEntity).IsAssignableFrom(entityType.ClrType);
             var existing = entityType.GetQueryFilter();
@@ -92,6 +106,19 @@ public sealed class TenantCompanyQueryFilterConvention(IScopedQueryFilterContext
             && (e.IsGlobal || e.TenantId == ctx.CurrentTenantId)
             && (ctx.CompanyFilterActive == false || ctx.AllowedCompanyIds.Contains(e.CompanyId));
 
+        return filter;
+    }
+
+    private static LambdaExpression BuildAppSettingFilter(IAppSettingMetadataQueryContext ctx)
+    {
+        Expression<Func<AppSetting, bool>> filter = e =>
+            e.DataStatus != DataState.Deleted
+            && (e.IsGlobal || e.TenantId == ctx.CurrentTenantId)
+            && (!ctx.CompanyFilterActive || ctx.AllowedCompanyIds.Contains(e.CompanyId)
+                || (e.TenantId == ctx.MetadataTenantId
+                    && ctx.MetadataTenantId == ctx.CurrentTenantId
+                    && e.Category == ctx.MetadataCategory && ctx.MetadataKeys.Contains(e.Key)
+                    && (ctx.MetadataReadAllCompanies || ctx.MetadataReadCompanyIds.Contains(e.CompanyId))));
         return filter;
     }
 
