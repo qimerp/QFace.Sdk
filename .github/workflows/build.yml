@@ -37,7 +37,6 @@ jobs:
           echo "DOTNET_ROOT=${INSTALL_DIR}" >> "${GITHUB_ENV}"
           "${INSTALL_DIR}/dotnet" --info
 
-
       - name: Fix documentation paths
         run: |
           ROOT_DIR=$(pwd)
