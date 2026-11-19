@@ -1,6 +1,6 @@
 <Project>
     <!-- Bump here for a Shared.Common release; QimErp.Shared.Common.Testing ships the same version and pins it exactly. -->
     <PropertyGroup>
-        <QimErpSharedCommonVersion>4.1.1</QimErpSharedCommonVersion>
+        <QimErpSharedCommonVersion>4.1.2</QimErpSharedCommonVersion>
     </PropertyGroup>
 </Project>

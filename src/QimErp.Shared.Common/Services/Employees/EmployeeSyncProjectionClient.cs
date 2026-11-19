@@ -27,56 +27,8 @@ public sealed class EmployeeSyncProjectionClient(
     public Task<EmployeeSyncProjection?> GetAsync(Guid employeeId, CancellationToken cancellationToken = default)
         => GetProjectionAsync(employeeId, "sync-projection", cancellationToken);
 
-    public Task<bool> SyncMicrosoftProfilePictureAsync(Guid employeeId, CancellationToken cancellationToken = default)
-        => PostInternalAsync(employeeId, "sync-microsoft-profile-picture", cancellationToken);
-
     public async Task<string?> GetDeletionEmailAsync(Guid employeeId, CancellationToken cancellationToken = default)
         => (await GetProjectionAsync(employeeId, "deletion-identity", cancellationToken))?.Email;
-
-    private async Task<bool> PostInternalAsync(Guid employeeId, string resource, CancellationToken cancellationToken)
-    {
-        var baseUrl = configuration["People:BaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            logger.LogError("People:BaseUrl is not configured — cannot call People {Resource} for {EmployeeId}", resource, employeeId);
-            return false;
-        }
-
-        var apiKey = internalApiOptions.Value.ExpectedApiKey;
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            logger.LogError("InternalApi:ExpectedApiKey is not configured — cannot call People {Resource}", resource);
-            return false;
-        }
-
-        var tenantId = currentUserService.GetTenantId();
-        if (string.IsNullOrWhiteSpace(tenantId))
-        {
-            logger.LogError("TenantId is not set — cannot call People {Resource} for {EmployeeId}", resource, employeeId);
-            return false;
-        }
-
-        var client = httpClientFactory.CreateClient(HttpClientName);
-        var tenant = tenantId.Trim();
-        var path = $"/internal/employees/{employeeId:D}/{resource}";
-        var timestamp = timeProvider.GetUtcNow();
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(baseUrl.TrimEnd('/') + "/"), path.TrimStart('/')));
-        request.Headers.Add("X-Internal-Api-Key", apiKey);
-        request.Headers.Add(InternalServiceSignature.TenantHeader, tenant);
-        request.Headers.Add(InternalServiceSignature.TimestampHeader, timestamp.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
-        request.Headers.Add(InternalServiceSignature.SignatureHeader,
-            InternalServiceSignature.Sign(apiKey, tenant, request.Method.Method, path, timestamp));
-        using var response = await client.SendAsync(request, cancellationToken);
-        if (response.IsSuccessStatusCode)
-            return true;
-
-        logger.LogWarning(
-            "People {Resource} returned {Status} for employee {EmployeeId}",
-            resource,
-            (int)response.StatusCode,
-            employeeId);
-        return false;
-    }
 
     private async Task<EmployeeSyncProjection?> GetProjectionAsync(Guid employeeId, string resource, CancellationToken cancellationToken)
     {
