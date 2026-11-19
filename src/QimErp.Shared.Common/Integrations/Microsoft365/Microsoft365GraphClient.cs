@@ -466,10 +466,21 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365ProfilePhotoResult> TryGetUserProfilePhotoAsync(
         string tenantId,
+        string companyId,
         string userPrincipalName,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = resolution.Error ?? "Microsoft 365 connection is not available."
+            };
+        }
+
         if (options is null || !options.EnableSyncProfilePictureFromMicrosoft)
         {
             return new Microsoft365ProfilePhotoResult

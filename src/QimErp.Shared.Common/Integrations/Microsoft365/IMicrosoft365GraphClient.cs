@@ -91,6 +91,7 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365ProfilePhotoResult> TryGetUserProfilePhotoAsync(
         string tenantId,
+        string companyId,
         string userPrincipalName,
         CancellationToken cancellationToken = default);
 }
