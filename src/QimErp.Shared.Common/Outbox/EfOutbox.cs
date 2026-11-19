@@ -11,6 +11,7 @@ internal sealed class EfOutbox(
     DbContext db,
     ITransportRouting routing,
     TimeProvider clock,
+    OutboxOrigin origin,
     IOptions<JsonSerializerOptions>? jsonOptions = null) : IOutbox
 {
     private static readonly JsonSerializerOptions DefaultJson = new(JsonSerializerDefaults.Web)
@@ -51,6 +52,7 @@ internal sealed class EfOutbox(
                 Payload = payloadJson,
                 OccurredAt = now,
                 NextAttemptAt = now,
+                Origin = origin.Value,
             });
         }
 

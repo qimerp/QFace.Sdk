@@ -61,6 +61,9 @@ public static class SharedCacheKeys
     public static string TenantMicrosoft365Config(Guid tenantId)
         => TenantMicrosoft365Config(tenantId.ToString());
 
+    public static string Microsoft365ConnectionCatalog(string tenantId)
+        => $"microsoft365:catalog:v2:tenant:{tenantId}";
+
     public static string TenantGoogleWorkspaceConfig(string tenantId)
         => $"{Prefix}{tenantId}:shared:tenant_google_workspace_config";
 

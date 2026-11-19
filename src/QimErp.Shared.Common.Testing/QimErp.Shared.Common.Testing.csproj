@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="../QimErp.Shared.Common/SharedCommonVersion.props" />
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <PackageId>QimErp.Shared.Common.Testing</PackageId>
+        <Version>$(QimErpSharedCommonVersion)</Version>
+        <Authors>IAmQwame</Authors>
+        <Company>QimErp</Company>
+        <Description>
+            Test-only helpers for QimErp.Shared.Common approval gating: seed the tenant workflow warm marker
+            or make chosen tenants report a warm workflow cache. Building a project that references this
+            package without IsTestProject=true fails (QIMTEST001).
+        </Description>
+        <PackageTags>qimerp;testing;workflow</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/iamqwame/QimErp</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/iamqwame/QimErp</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>1591;1573;1574</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../QimErp.Shared.Common/QimErp.Shared.Common.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="README.md" Pack="true" PackagePath="/" />
+        <None Remove="build/QimErp.Shared.Common.Testing.targets" />
+        <None Include="build/QimErp.Shared.Common.Testing.targets" Pack="true" PackagePath="build/QimErp.Shared.Common.Testing.targets;buildTransitive/QimErp.Shared.Common.Testing.targets" />
+    </ItemGroup>
+
+    <!-- The helpers depend on Shared.Common types added in the same release, so the dependency is pinned exactly. -->
+    <Target Name="PinSharedCommonDependency" AfterTargets="_GetProjectReferenceVersions">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Condition="'%(Filename)' == 'QimErp.Shared.Common'">
+                <ProjectVersion>[%(ProjectVersion)]</ProjectVersion>
+            </_ProjectReferencesWithVersions>
+        </ItemGroup>
+    </Target>
+
+</Project>

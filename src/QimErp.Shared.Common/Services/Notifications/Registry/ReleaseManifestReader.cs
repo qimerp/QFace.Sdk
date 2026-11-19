@@ -143,7 +143,8 @@ public sealed class ReleaseManifestReader : IDisposable
         string intentKey,
         int intentVersion,
         string audience,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? variant = null)
     {
         ArgumentNullException.ThrowIfNull(manifest);
 
@@ -153,6 +154,14 @@ public sealed class ReleaseManifestReader : IDisposable
         var template = manifest.Templates.FirstOrDefault(t => string.Equals(t.Code, templateCode, StringComparison.Ordinal));
         if (template is null)
             return Fail(RegistryFailure.TemplateMissing);
+
+        var htmlKey = template.HtmlKey;
+        if (variant is not null)
+        {
+            if (template.Branding is null || !template.Branding.Variants.TryGetValue(variant, out var declaredVariant))
+                return Fail(RegistryFailure.TemplateMissing);
+            htmlKey = declaredVariant.HtmlKey;
+        }
 
         var declaration = template.Intents.FirstOrDefault(d =>
             string.Equals(d.Key, intentKey, StringComparison.Ordinal)
@@ -196,7 +205,7 @@ public sealed class ReleaseManifestReader : IDisposable
         if (!contract.Audiences.Any(a => string.Equals(a.Key, audience, StringComparison.Ordinal)))
             return Fail(RegistryFailure.TemplateIntentMismatch);
 
-        var html = await ReadVerifiedObjectAsync(manifest, template.HtmlKey, ct);
+        var html = await ReadVerifiedObjectAsync(manifest, htmlKey, ct);
         if (!html.Succeeded)
             return Fail(html.Failure);
 
@@ -215,7 +224,12 @@ public sealed class ReleaseManifestReader : IDisposable
             return Fail(RegistryFailure.ManifestInvalid);
         }
 
-        return RegistryResult<PinnedTemplate>.Ok(new PinnedTemplate(template, declaration, htmlContent, textContent, contract, lockedSha256));
+        var htmlSha256 = manifest.Objects.First(o => string.Equals(o.Key, htmlKey, StringComparison.Ordinal)).Sha256;
+        return RegistryResult<PinnedTemplate>.Ok(new PinnedTemplate(template, declaration, htmlContent, textContent, contract, lockedSha256)
+        {
+            Variant = variant,
+            VariantHtmlSha256 = htmlSha256,
+        });
     }
 
     public void Dispose() => _cache.Dispose();

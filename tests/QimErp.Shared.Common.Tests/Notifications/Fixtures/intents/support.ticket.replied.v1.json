@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "key": "support.ticket.replied",
+  "version": 1,
+  "owner": {
+    "domain": "support",
+    "service": "QimErp.Operator"
+  },
+  "summary": "Support replied on a ticket.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "requester",
+      "recipient": {
+        "source": "platform",
+        "from": "recipientId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "recipientId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TicketNumber",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "TCK-0001"
+    },
+    {
+      "name": "TicketTitle",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Confidential",
+      "resolvedAt": "precheck",
+      "example": "Example ticket title"
+    },
+    {
+      "name": "Reference",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "REF-0001"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://app.example.qimerp.com/example/support/TCK-0001",
+      "resolvedFrom": "workspace.appUrl",
+      "url": {
+        "host": "platform-frontend",
+        "purpose": "workspace_app"
+      }
+    }
+  ]
+}

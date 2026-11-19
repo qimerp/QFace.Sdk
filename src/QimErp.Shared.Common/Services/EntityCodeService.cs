@@ -37,6 +37,8 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
     // ≥ fan-out of concurrent InMemory GenerateAsync callers (product create test uses 10).
     private const int NonRelationalConcurrencyAttempts = 12;
 
+    private const int BulkCreateAttempts = 3;
+
     private static string EffectiveCompanyId => CompanyContext.CurrentScope.EffectiveCompanyId;
 
     // Tenant-unique master codes reserve with CompanyId "".
@@ -486,14 +488,120 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
     }
 
     public async Task<IReadOnlyList<EntityCodeConfig>> GetAllConfigsAsync(string tenantId, CancellationToken ct = default)
+        => await GetOrCreateConfigsAsync(tenantId, EffectiveCompanyId, _defaults.Keys.ToArray(), ct);
+
+    public async Task<IReadOnlyList<EntityCodeConfig>> GetConfigsForModuleAsync(
+        string tenantId, string? module, CancellationToken ct = default)
     {
-        var companyId = EffectiveCompanyId;
-        var configs = new List<EntityCodeConfig>(_defaults.Count);
-        foreach (var entityType in _defaults.Keys)
+        if (string.IsNullOrWhiteSpace(module))
+            return await GetAllConfigsAsync(tenantId, ct);
+
+        var wanted = module.Trim();
+        var entityTypes = _defaults.Keys
+            .Where(entityType => string.Equals(GetModuleFor(entityType), wanted, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return await GetOrCreateConfigsAsync(tenantId, EffectiveCompanyId, entityTypes, ct);
+    }
+
+    private async Task<IReadOnlyList<EntityCodeConfig>> GetOrCreateConfigsAsync(
+        string tenantId, string companyId, string[] entityTypes, CancellationToken ct)
+    {
+        if (entityTypes.Length == 0)
+            return [];
+
+        EnsureTenantId(tenantId);
+
+        for (var attempt = 1; ; attempt++)
         {
-            configs.Add(await GetOrCreateConfigAsync(tenantId, companyId, entityType, ct));
+            // IgnoreQueryFilters: explicit tenant scope.
+            var rows = await _context.Set<EntityCodeConfig>()
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(e => e.TenantId == tenantId
+                            && (e.CompanyId == companyId || e.CompanyId == string.Empty)
+                            && entityTypes.Contains(e.EntityType))
+                .ToListAsync(ct);
+
+            var existing = new Dictionary<string, EntityCodeConfig>(StringComparer.Ordinal);
+            var tenantWide = new Dictionary<string, EntityCodeConfig>(StringComparer.Ordinal);
+            foreach (var row in rows)
+            {
+                if (row.CompanyId == companyId)
+                    existing.TryAdd(row.EntityType, row);
+                else
+                    tenantWide.TryAdd(row.EntityType, row);
+            }
+
+            var configs = new List<EntityCodeConfig>(entityTypes.Length);
+            var created = new List<EntityCodeConfig>();
+            foreach (var entityType in entityTypes)
+            {
+                if (existing.TryGetValue(entityType, out var found))
+                {
+                    configs.Add(found);
+                    continue;
+                }
+
+                var config = CreateDefaultConfig(tenantId, entityType);
+                if (companyId.Length > 0 && tenantWide.TryGetValue(entityType, out var seed))
+                    config.SeedSequenceFrom(seed);
+
+                created.Add(config);
+                configs.Add(config);
+            }
+
+            if (created.Count == 0)
+                return configs;
+
+            try
+            {
+                await SaveNewConfigsAsync(created, companyId, ct);
+            }
+            catch (DbUpdateException) when (attempt < BulkCreateAttempts && _context.Database.CurrentTransaction is null)
+            {
+                foreach (var config in created)
+                    _context.Entry(config).State = EntityState.Detached;
+                continue;
+            }
+
+            foreach (var config in created)
+                await _cache.RemoveAsync(CacheKey(tenantId, companyId, config.EntityType));
+
+            _logger.LogInformation(
+                "Auto-created {Count} EntityCodeConfig rows on tenant {TenantId} company {CompanyId}",
+                created.Count, tenantId, companyId);
+
+            return configs;
         }
-        return configs;
+    }
+
+    private async Task SaveNewConfigsAsync(List<EntityCodeConfig> configs, string companyId, CancellationToken ct)
+    {
+        if (companyId.Length > 0)
+        {
+            foreach (var config in configs)
+                config.WithCompanyId(companyId);
+            _context.Set<EntityCodeConfig>().AddRange(configs);
+            await _context.SaveChangesAsync(ct);
+            return;
+        }
+
+        using (CompanyStampScope.EnterSharedAsTenantWideWriter($"EntityCodeConfig ({configs.Count} entity types)"))
+        {
+            _context.Set<EntityCodeConfig>().AddRange(configs);
+            await _context.SaveChangesAsync(ct);
+        }
+    }
+
+    private EntityCodeConfig CreateDefaultConfig(string tenantId, string entityType)
+    {
+        _defaults.TryGetValue(entityType, out var def);
+        return EntityCodeConfig.Create(
+            tenantId, entityType,
+            prefix:      def.Prefix      ?? entityType[..Math.Min(3, entityType.Length)].ToUpper(),
+            separator:   def.Separator   ?? "-",
+            includeYear: def.IncludeYear,
+            paddingWidth: def.PaddingWidth > 0 ? def.PaddingWidth : 4);
     }
 
     private async Task<EntityCodeConfig> GetOrCreateConfigAsync(
@@ -502,14 +610,7 @@ public abstract class EntityCodeService<TContext> : IEntityCodeService
         var config = await GetConfigAsync(tenantId, companyId, entityType, ct);
         if (config is not null) return config;
 
-        // Auto-create from merged defaults (SDK + module); bare minimum if entity type is unknown
-        _defaults.TryGetValue(entityType, out var def);
-        config = EntityCodeConfig.Create(
-            tenantId, entityType,
-            prefix:      def.Prefix      ?? entityType[..Math.Min(3, entityType.Length)].ToUpper(),
-            separator:   def.Separator   ?? "-",
-            includeYear: def.IncludeYear,
-            paddingWidth: def.PaddingWidth > 0 ? def.PaddingWidth : 4);
+        config = CreateDefaultConfig(tenantId, entityType);
 
         // Enabling multi-company must not restart numbering: continue the tenant-wide sequence.
         if (companyId.Length > 0)

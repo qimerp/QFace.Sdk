@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "key": "app_store.item.installed",
+  "version": 1,
+  "owner": {
+    "domain": "app_store",
+    "service": "QimErp.Platform"
+  },
+  "summary": "A module or plugin was added to the workspace.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "installer",
+      "recipient": {
+        "source": "platform",
+        "from": "userId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "userId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "WorkspaceUrl",
+      "type": "hostname",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "workspace.example.qimerp.com",
+      "resolvedFrom": "tenant.workspaceHost"
+    },
+    {
+      "name": "ModuleName",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example module"
+    },
+    {
+      "name": "Amount",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Included in your plan"
+    },
+    {
+      "name": "PlanName",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example plan"
+    },
+    {
+      "name": "OccurredAt",
+      "type": "datetime",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "2026-11-07T09:42:00Z"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://app.example.qimerp.com/example/app-store/example-item",
+      "resolvedFrom": "workspace.appUrl",
+      "url": {
+        "host": "platform-frontend",
+        "purpose": "workspace_app"
+      }
+    }
+  ]
+}

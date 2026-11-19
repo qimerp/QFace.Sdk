@@ -67,8 +67,8 @@ public class ResponseLoggingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing response for {Method} {Path}",
-                context.Request.Method, context.Request.Path);
+            _logger.LogError(AnonymousRequests.IsAnonymous(context) ? AnonymousRequests.TypeOnly(ex) : ex,
+                "Error processing response for {Method} {Path}", context.Request.Method, context.Request.Path);
             throw;
         }
     }
@@ -107,6 +107,15 @@ public class ResponseLoggingMiddleware
             >= 400 => LogLevel.Warning,
             _ => _options.LogLevel,
         };
+
+        if (AnonymousRequests.IsAnonymous(context))
+        {
+            _logger.Log(statusLogLevel, "HTTP response {StatusCode} {Method} {Path}",
+                response.StatusCode, request.Method, request.Path.Value ?? "");
+            memoryStream.Position = 0;
+            await memoryStream.CopyToAsync(originalBodyStream);
+            return;
+        }
 
         var userService = context.RequestServices.GetService<ICurrentUserService>();
         using (_logger.BeginUserContextScope(userService))

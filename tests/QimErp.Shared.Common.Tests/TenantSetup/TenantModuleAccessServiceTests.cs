@@ -1,5 +1,10 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using QFace.Sdk.RedisCache.Services;
+using RedisCacheService = QimErp.Shared.Common.Services.Cache.RedisCacheService;
 using QimErp.Shared.Common.Constants;
 using QimErp.Shared.Common.Contracts;
 using QimErp.Shared.Common.Services.Cache;
@@ -166,6 +171,89 @@ public class TenantModuleAccessServiceTests
         var enabled = await service.IsModuleEnabledAsync(TenantId, moduleKey);
 
         enabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetModuleAccessAsync_Enabled_WhenSnapshotContainsModule()
+    {
+        var cache = new InMemoryDistributedCacheService();
+        await cache.SetAsync(
+            SharedCacheKeys.TenantModuleSnapshot(Guid.Parse(TenantId)),
+            new TenantModuleSnapshotEntry(1, [ModuleKeys.CoreHR, ModuleKeys.Workflow]),
+            expiration: null);
+
+        (await CreateService(cache).GetModuleAccessAsync(TenantId, ModuleKeys.Workflow))
+            .Should().Be(ModuleAccess.Enabled);
+    }
+
+    [Fact]
+    public async Task GetModuleAccessAsync_NotInstalled_WhenSnapshotExcludesModule()
+    {
+        var cache = new InMemoryDistributedCacheService();
+        await cache.SetAsync(
+            SharedCacheKeys.TenantModuleSnapshot(Guid.Parse(TenantId)),
+            new TenantModuleSnapshotEntry(1, [ModuleKeys.CoreHR]),
+            expiration: null);
+
+        (await CreateService(cache).GetModuleAccessAsync(TenantId, ModuleKeys.Workflow))
+            .Should().Be(ModuleAccess.NotInstalled);
+    }
+
+    [Fact]
+    public async Task GetModuleAccessAsync_Unknown_WhenSnapshotMissing()
+    {
+        var service = CreateService(new InMemoryDistributedCacheService());
+
+        (await service.GetModuleAccessAsync(TenantId, ModuleKeys.Workflow)).Should().Be(ModuleAccess.Unknown);
+        (await service.IsModuleEnabledAsync(TenantId, ModuleKeys.Workflow)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetModuleAccessAsync_Unknown_WhenRedisReadFails_AndHttpGatingFailsClosed()
+    {
+        var redis = new Mock<IGlobalRedisCacheService>();
+        redis.Setup(r => r.GetAsync<TenantModuleSnapshotEntry>(It.IsAny<string>()))
+            .ThrowsAsync(new TimeoutException("redis unavailable"));
+        var cache = new SharedRedisCacheService(
+            redis.Object, NullLogger<RedisCacheService>.Instance, new ConfigurationBuilder().Build());
+        var service = CreateService(cache);
+
+        (await service.GetModuleAccessAsync(TenantId, ModuleKeys.Workflow)).Should().Be(ModuleAccess.Unknown);
+        (await service.IsModuleEnabledAsync(TenantId, ModuleKeys.Workflow)).Should().BeFalse();
+        (await service.GetInstalledModuleKeysAsync(TenantId)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetModuleAccessAsync_BaseModelModule_EnabledWithoutSnapshot()
+    {
+        (await CreateService(new InMemoryDistributedCacheService()).GetModuleAccessAsync(TenantId, ModuleKeys.Leave))
+            .Should().Be(ModuleAccess.Enabled);
+    }
+
+    [Fact]
+    public async Task GetModuleAccessAsync_NotInstalled_WhenTenantMissing()
+    {
+        (await CreateService(new InMemoryDistributedCacheService()).GetModuleAccessAsync(null, ModuleKeys.Workflow))
+            .Should().Be(ModuleAccess.NotInstalled);
+    }
+
+    [Theory]
+    [InlineData(true, ModuleAccess.Enabled)]
+    [InlineData(false, ModuleAccess.NotInstalled)]
+    public async Task GetModuleAccessAsync_DefaultImplementation_MapsLegacyBoolean(bool enabled, ModuleAccess expected)
+    {
+        ITenantModuleAccessService legacy = new LegacyModuleAccess(enabled);
+
+        (await legacy.GetModuleAccessAsync(TenantId, ModuleKeys.Workflow)).Should().Be(expected);
+    }
+
+    private sealed class LegacyModuleAccess(bool enabled) : ITenantModuleAccessService
+    {
+        public Task<bool> IsModuleEnabledAsync(string? tenantId, string moduleKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(enabled);
+
+        public Task<IReadOnlyList<string>?> GetInstalledModuleKeysAsync(string? tenantId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
     }
 
     private static TenantModuleAccessService CreateService(

@@ -33,6 +33,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\QimErp.Shared.Common\QimErp.Shared.Common.csproj" />
         <ProjectReference Include="..\..\src\QFace.Sdk.Temporal\QFace.Sdk.Temporal.csproj" />
+        <ProjectReference Include="..\..\src\QFace.Sdk.Logging\QFace.Sdk.Logging.csproj" />
     </ItemGroup>
 
 </Project>

@@ -61,6 +61,23 @@ public interface IEntityCodeService
     Task<IReadOnlyList<EntityCodeConfig>> GetAllConfigsAsync(string tenantId, CancellationToken ct = default);
 
     /// <summary>
+    /// <see cref="GetAllConfigsAsync"/> limited to entity types whose <see cref="GetModuleFor"/> equals
+    /// <paramref name="module"/> case-insensitively. Null or blank returns every config.
+    /// </summary>
+    async Task<IReadOnlyList<EntityCodeConfig>> GetConfigsForModuleAsync(
+        string tenantId, string? module, CancellationToken ct = default)
+    {
+        var all = await GetAllConfigsAsync(tenantId, ct);
+        if (string.IsNullOrWhiteSpace(module))
+            return all;
+
+        var wanted = module.Trim();
+        return all
+            .Where(config => string.Equals(GetModuleFor(config.EntityType), wanted, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
     /// The module that owns numbering for this entity type (e.g. "Payroll", "Inventory") — always
     /// this service's own module, since every entity type it knows about is one it registered itself.
     /// </summary>

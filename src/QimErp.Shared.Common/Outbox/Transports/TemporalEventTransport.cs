@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using QFace.Sdk.Temporal.Options;
+using QimErp.Shared.Common.Services.Workflow.Temporal;
 using QimErp.Shared.Common.Services.Workflow;
 using Temporalio.Api.Enums.V1;
 using Temporalio.Client;
@@ -102,13 +102,8 @@ internal sealed class TemporalEventTransport(
 
     private static string ResolveTaskQueue(IServiceProvider sp, string baseQueue)
     {
-        var opts = sp.GetService<IOptions<TemporalOptions>>()?.Value;
-        if (opts is not null)
-            return opts.WithTaskQueueSuffix(baseQueue);
-
-        var suffix = sp.GetService<IConfiguration>()?["Temporal:TaskQueueSuffix"] ?? string.Empty;
-        if (string.IsNullOrEmpty(suffix)) return baseQueue;
-        return baseQueue.EndsWith(suffix, StringComparison.Ordinal) ? baseQueue : baseQueue + suffix;
+        var origin = sp.GetService<OutboxOrigin>() ?? OutboxOrigin.FromServices(sp);
+        return TemporalConstants.ApplyTaskQueueSuffix(baseQueue, origin.Value);
     }
 }
 

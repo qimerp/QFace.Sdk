@@ -6,7 +6,7 @@ public class RedisCacheService(
     IRedisCacheService redisCacheService,
     ILogger<RedisCacheService> logger,
     IConfiguration configuration)
-    : IDistributedCacheService
+    : IDistributedCacheService, ICacheEntryReader
 {
     private readonly bool _cacheEnabled = GetCacheEnabled(configuration);
 
@@ -55,6 +55,41 @@ public class RedisCacheService(
         {
             logger.LogError("Error retrieving from cache for key: {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
             return default;
+        }
+    }
+
+    /// <remarks>
+    /// With <c>RedisCache:Enabled=false</c> every key reports <see cref="CacheReadStatus.Miss"/>; the warm marker is then
+    /// missing too, so approval gating refuses workflow-enabled saves. A startup Error is logged for that setting.
+    /// </remarks>
+    public async Task<CacheReadResult<T>> ReadEntryAsync<T>(string key, string? region = null)
+    {
+        if (!_cacheEnabled)
+        {
+            logger.LogDebug("Cache disabled - ReadEntryAsync reporting a miss for key: {Key}", key);
+            return CacheReadResult<T>.Missing();
+        }
+
+        try
+        {
+            var fullKey = GetFullKey(key, region);
+            var cachedValue = await redisCacheService.GetAsync<T>(fullKey);
+            if (!EqualityComparer<T>.Default.Equals(cachedValue, default(T)))
+                return CacheReadResult<T>.Found(cachedValue);
+
+            if (!await redisCacheService.ExistsAsync(fullKey))
+                return CacheReadResult<T>.Missing();
+
+            if (cachedValue is not null)
+                return CacheReadResult<T>.Found(cachedValue);
+
+            logger.LogWarning("Cache entry for key: {Key} exists but could not be read as {Type}", fullKey, typeof(T).Name);
+            return CacheReadResult<T>.Unreadable();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Error retrieving from cache for key: {Key} as {Type} ({ExceptionType})", key, typeof(T).Name, ex.GetType().Name);
+            return CacheReadResult<T>.Unreadable();
         }
     }
 

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "key": "tenant.reply_address.verification_requested",
+  "version": 1,
+  "owner": {
+    "domain": "tenant",
+    "service": "QimErp.Platform"
+  },
+  "summary": "A tenant administrator asked to confirm a reply-to address for tenant emails with a code.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "reply_mailbox",
+      "recipient": {
+        "source": "platform",
+        "from": "verificationId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "verificationId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "Code",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Sensitive",
+      "resolvedAt": "precheck",
+      "example": "482913"
+    },
+    {
+      "name": "ExpiresAt",
+      "type": "datetime",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "2026-11-12T10:30:00Z"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    }
+  ]
+}

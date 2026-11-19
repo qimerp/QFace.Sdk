@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "key": "workflow.request.rejected",
+  "version": 1,
+  "owner": {
+    "domain": "workflow",
+    "service": "QimErp.Platform"
+  },
+  "summary": "A workflow request was rejected.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "workflow_participant",
+      "recipient": {
+        "source": "platform",
+        "from": "recipientId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "recipientId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "ItemTitle",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Confidential",
+      "resolvedAt": "precheck",
+      "example": "Example request title"
+    },
+    {
+      "name": "ItemCode",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "EXAMPLE-001"
+    },
+    {
+      "name": "Decision",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "declined"
+    },
+    {
+      "name": "Dates",
+      "type": "text",
+      "required": false,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "7–11 Dec 2026"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "https://app.example.qimerp.com/example/workflows/instances/00000000-0000-4000-8000-000000000001",
+      "resolvedFrom": "workspace.appUrl",
+      "url": {
+        "host": "platform-frontend",
+        "purpose": "workspace_app"
+      }
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "TenantInitials",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "ET",
+      "resolvedFrom": "tenant.initials"
+    }
+  ]
+}

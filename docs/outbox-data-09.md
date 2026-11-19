@@ -1,5 +1,13 @@
 # Durable outbox (DATA-09) — module migration
 
+> **Breaking schema step (QimErp.Shared.Common 3.11.55+).** The SDK writes and claims outbox rows by
+> a new `"Origin"` column. A service that bumps the package without the `AddOutboxOrigin` migration
+> would fail every save that writes an outbox row (Postgres 42703), and its InMemory tests would still
+> pass. On PostgreSQL the host now refuses to start (logged at Critical) when the outbox table or its
+> `"Origin"` column is missing; InMemory hosts skip the check. Follow
+> [Consumer upgrade steps](#consumer-upgrade-steps-each-service-that-owns-an-outboxmessages-table)
+> before deploying.
+
 `AddDbContextWithOutbox*` now registers a **real same-transaction outbox** plus an Akka relay
 (poller → consistent-hash router → dispatch workers), matching QFace Data Standard DATA-09 /
 Appendix 1.
@@ -68,7 +76,131 @@ Table shape (Postgres):
 | LastError | text |
 | ProcessedAt / DeadAt | timestamptz |
 
-Index: ready rows on `NextAttemptAt` where `ProcessedAt` and `DeadAt` are null.
+| Origin | text, nullable (3.11.55+) |
+
+Indexes: ready rows on `NextAttemptAt`, and on `(Origin, NextAttemptAt)` (`ix_outbox_origin_ready`, 3.11.55+),
+both where `ProcessedAt` and `DeadAt` are null.
+
+## Origin: one database, many machines (3.11.55+)
+
+Laptops and the deployed services share one database per module. Every row records the writer's
+effective `Temporal:TaskQueueSuffix` in `Origin` (`""` when deployed), and a relay claims only rows
+of its own origin, so a laptop never runs or dispatches work written by Contabo or another laptop.
+
+| Row `Origin` | Claimed by |
+| --- | --- |
+| `""` | the unsuffixed (deployed) relay |
+| `"-local"`, `"-local-pd"`, ... | only a relay with that exact suffix |
+| `NULL` (written by an SDK before 3.11.55) | only the unsuffixed (deployed) relay |
+
+`IOutbox.Add` stamps the origin. Rows added directly (`db.OutboxMessages.Add(new OutboxMessage { ... })`)
+are stamped by `AuditEntitySaveChangesInterceptor` when `Origin` is null, so contexts registered with
+`AddDbContextWithOutbox*` are covered. A row whose writer never comes back (a laptop that went offline)
+stays pending; replay it from that origin or update its `Origin` by hand.
+`OutboxBackstopIntegrityCheck` counts only stuck rows of its own origin and reports other origins in
+`IntegrityCheckResult.NotOwnedCounts` (logged as `data_integrity_not_owned`).
+
+### Consumer upgrade steps (each service that owns an `OutboxMessages` table)
+
+`OutboxMessageConfiguration` is applied by `ApplicationDbContext`, so bumping the package changes
+the model and EF reports pending changes until a migration exists.
+
+1. Bump `QimErp.Shared.Common` to 3.11.55 or later.
+2. Add **two** migrations per DbContext that maps `OutboxMessage`. Keep the column and the index
+   apart: EF records a migration only after all of its statements succeed, so if a single migration
+   held both and the concurrent index build was interrupted, the rerun would repeat `AddColumn` and
+   fail. With the split, a rerun redoes only the idempotent index migration. Qualify the index SQL
+   with the table's schema (`public` for most services, `reporting` for Reporting).
+
+   Reference: QimErp.Platform `development` 4a4b0e3,
+   `src/QimErp.Platform.Shared/Database/Migrations/20261115030836_AddOutboxOrigin.cs` and
+   `20261115032337_AddOutboxOriginIndex.cs`.
+
+3. **`AddOutboxOrigin`** — `dotnet ef migrations add AddOutboxOrigin --project <Infrastructure/Shared project> --startup-project <WebApi>`.
+   Delete the scaffolded `CreateIndex` / `DropIndex`; the model snapshot keeps the index. Keep the
+   nullable `AddColumn` (no default, so Postgres adds it without a rewrite) behind a lock timeout:
+
+   ```csharp
+   protected override void Up(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.Sql("SET LOCAL lock_timeout = '15s';");
+
+       migrationBuilder.AddColumn<string>(
+           name: "Origin",
+           table: "OutboxMessages",
+           type: "text",
+           nullable: true);
+   }
+
+   protected override void Down(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.DropColumn(
+           name: "Origin",
+           table: "OutboxMessages");
+   }
+   ```
+
+   **`AddOutboxOriginIndex`** — `dotnet ef migrations add AddOutboxOriginIndex ...` scaffolds an
+   empty migration (the model already has the index). Fill it in. An interrupted
+   `CREATE INDEX CONCURRENTLY` leaves an invalid index that `IF NOT EXISTS` would keep, so drop an
+   invalid one first, then build concurrently outside a transaction:
+
+   ```csharp
+   private const string Schema = "public";
+
+   protected override void Up(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.Sql(
+           $$"""
+           SET LOCAL lock_timeout = '15s';
+           DO $drop$
+           BEGIN
+               IF EXISTS (
+                   SELECT 1
+                     FROM pg_index i
+                     JOIN pg_class c ON c.oid = i.indexrelid
+                     JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = '{{Schema}}'
+                      AND c.relname = 'ix_outbox_origin_ready'
+                      AND NOT i.indisvalid) THEN
+                   DROP INDEX "{{Schema}}".ix_outbox_origin_ready;
+               END IF;
+           END
+           $drop$;
+           """);
+
+       migrationBuilder.Sql(
+           $$"""
+           CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_outbox_origin_ready
+               ON "{{Schema}}"."OutboxMessages" ("Origin", "NextAttemptAt")
+               WHERE "ProcessedAt" IS NULL AND "DeadAt" IS NULL;
+           """,
+           suppressTransaction: true);
+   }
+
+   protected override void Down(MigrationBuilder migrationBuilder)
+   {
+       migrationBuilder.Sql(
+           $$"""DROP INDEX CONCURRENTLY IF EXISTS "{{Schema}}".ix_outbox_origin_ready;""",
+           suppressTransaction: true);
+   }
+   ```
+
+   After applying, confirm the index is valid:
+
+   ```sql
+   SELECT i.indisvalid
+     FROM pg_index i
+     JOIN pg_class c ON c.oid = i.indexrelid
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'ix_outbox_origin_ready';
+   ```
+4. Apply both migrations before any 3.11.55 binary of that service starts; otherwise the startup
+   check stops the host. The change is additive, so binaries on older SDKs keep working against
+   the migrated table.
+5. Upgrade the deployed service and every developer machine. Until all of them run 3.11.55+, an
+   older relay still claims rows of any origin.
+6. Do not backfill `Origin` on existing rows: pending `NULL` rows belong to the deployed relay.
 
 ## Configuration
 

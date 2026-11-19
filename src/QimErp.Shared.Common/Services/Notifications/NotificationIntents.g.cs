@@ -4,13 +4,61 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "32cefcda6dd99a1f156f3e4c8520c7ce2e887351e340e8656f9241cfe419b661";
+    public const string ContractRevision = "fbf9e874f6a16c5b7185fc83735cec4662afbf8cb56d1e60f7a5497e32a8c84e";
+
+    public static class AppStore
+    {
+        public static class ItemInstalled
+        {
+            public const string Key = "app_store.item.installed";
+            public const int V1 = 1;
+        }
+    }
 
     public static class Auth
     {
+        public static class AccountActivationRequested
+        {
+            public const string Key = "auth.account.activation_requested";
+            public const int V1 = 1;
+        }
+        public static class MfaSetupReminder
+        {
+            public const string Key = "auth.mfa.setup_reminder";
+            public const int V1 = 1;
+        }
+        public static class PasswordAdminReset
+        {
+            public const string Key = "auth.password.admin_reset";
+            public const int V1 = 1;
+        }
+        public static class PasswordChanged
+        {
+            public const string Key = "auth.password.changed";
+            public const int V1 = 1;
+        }
         public static class PasswordResetRequested
         {
             public const string Key = "auth.password_reset.requested";
+            public const int V1 = 1;
+        }
+        public static class SignInSucceeded
+        {
+            public const string Key = "auth.sign_in.succeeded";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class Iam
+    {
+        public static class AccessReviewReminder
+        {
+            public const string Key = "iam.access_review.reminder";
+            public const int V1 = 1;
+        }
+        public static class AuditFollowUpAssigned
+        {
+            public const string Key = "iam.audit_follow_up.assigned";
             public const int V1 = 1;
         }
     }
@@ -24,8 +72,189 @@ public static class NotificationIntents
         }
     }
 
+    public static class Payroll
+    {
+        public static class PayslipReady
+        {
+            public const string Key = "payroll.payslip.ready";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class People
+    {
+        public static class BenefitEnrollmentClosing
+        {
+            public const string Key = "people.benefit_enrollment.closing";
+            public const int V1 = 1;
+        }
+        public static class DocumentExpiring
+        {
+            public const string Key = "people.document.expiring";
+            public const int V1 = 1;
+        }
+        public static class EmployeeMessageReceived
+        {
+            public const string Key = "people.employee_message.received";
+            public const int V1 = 1;
+        }
+        public static class HrMessageSent
+        {
+            public const string Key = "people.hr_message.sent";
+            public const int V1 = 1;
+        }
+        public static class LeaveCoverAssigned
+        {
+            public const string Key = "people.leave_cover.assigned";
+            public const int V1 = 1;
+        }
+        public static class LeavePlanNudged
+        {
+            public const string Key = "people.leave_plan.nudged";
+            public const int V1 = 1;
+        }
+        public static class LeaveRequestDecided
+        {
+            public const string Key = "people.leave_request.decided";
+            public const int V1 = 1;
+        }
+        public static class LeaveRequestSubmitted
+        {
+            public const string Key = "people.leave_request.submitted";
+            public const int V1 = 1;
+        }
+        public static class NewsPublished
+        {
+            public const string Key = "people.news.published";
+            public const int V1 = 1;
+        }
+        public static class OnboardingCancelled
+        {
+            public const string Key = "people.onboarding.cancelled";
+            public const int V1 = 1;
+        }
+        public static class OnboardingHelperAssigned
+        {
+            public const string Key = "people.onboarding.helper_assigned";
+            public const int V1 = 1;
+        }
+        public static class OnboardingMessageSent
+        {
+            public const string Key = "people.onboarding.message_sent";
+            public const int V1 = 1;
+        }
+        public static class OnboardingTaskCompleted
+        {
+            public const string Key = "people.onboarding_task.completed";
+            public const int V1 = 1;
+        }
+        public static class OnboardingTaskEscalated
+        {
+            public const string Key = "people.onboarding_task.escalated";
+            public const int V1 = 1;
+        }
+        public static class OnboardingTaskReminder
+        {
+            public const string Key = "people.onboarding_task.reminder";
+            public const int V1 = 1;
+        }
+        public static class RetirementNoticeDue
+        {
+            public const string Key = "people.retirement.notice_due";
+            public const int V1 = 1;
+        }
+        public static class SurveyInvited
+        {
+            public const string Key = "people.survey.invited";
+            public const int V1 = 1;
+        }
+        public static class SurveyReminded
+        {
+            public const string Key = "people.survey.reminded";
+            public const int V1 = 1;
+        }
+        public static class WorkAnniversaryToday
+        {
+            public const string Key = "people.work_anniversary.today";
+            public const int V1 = 1;
+        }
+        public static class WorkAnniversaryUpcoming
+        {
+            public const string Key = "people.work_anniversary.upcoming";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class Support
+    {
+        public static class TicketAssigned
+        {
+            public const string Key = "support.ticket.assigned";
+            public const int V1 = 1;
+        }
+        public static class TicketQueued
+        {
+            public const string Key = "support.ticket.queued";
+            public const int V1 = 1;
+        }
+        public static class TicketReceived
+        {
+            public const string Key = "support.ticket.received";
+            public const int V1 = 1;
+        }
+        public static class TicketReplied
+        {
+            public const string Key = "support.ticket.replied";
+            public const int V1 = 1;
+        }
+        public static class TicketResolved
+        {
+            public const string Key = "support.ticket.resolved";
+            public const int V1 = 1;
+        }
+        public static class TicketSlaBreached
+        {
+            public const string Key = "support.ticket.sla_breached";
+            public const int V1 = 1;
+        }
+    }
+
+    public static class Tenant
+    {
+        public static class OwnerActivationRequested
+        {
+            public const string Key = "tenant.owner.activation_requested";
+            public const int V1 = 1;
+        }
+        public static class ReplyAddressVerificationRequested
+        {
+            public const string Key = "tenant.reply_address.verification_requested";
+            public const int V1 = 1;
+        }
+        public static class WorkspaceReady
+        {
+            public const string Key = "tenant.workspace.ready";
+            public const int V1 = 1;
+        }
+        public static class WorkspaceRequestApproved
+        {
+            public const string Key = "tenant.workspace_request.approved";
+            public const int V1 = 1;
+        }
+        public static class WorkspaceRequestRejected
+        {
+            public const string Key = "tenant.workspace_request.rejected";
+            public const int V1 = 1;
+        }
+    }
+
     public static class Workflow
     {
+        public static class ApprovalOverdue
+        {
+            public const string Key = "workflow.approval.overdue";
+            public const int V1 = 1;
+        }
         public static class ApprovalReminder
         {
             public const string Key = "workflow.approval.reminder";
@@ -34,6 +263,31 @@ public static class NotificationIntents
         public static class ApprovalRequested
         {
             public const string Key = "workflow.approval.requested";
+            public const int V1 = 1;
+        }
+        public static class RequestApproved
+        {
+            public const string Key = "workflow.request.approved";
+            public const int V1 = 1;
+        }
+        public static class RequestRejected
+        {
+            public const string Key = "workflow.request.rejected";
+            public const int V1 = 1;
+        }
+        public static class RequestReturned
+        {
+            public const string Key = "workflow.request.returned";
+            public const int V1 = 1;
+        }
+        public static class RequestStageAdvanced
+        {
+            public const string Key = "workflow.request.stage_advanced";
+            public const int V1 = 1;
+        }
+        public static class RequestStarted
+        {
+            public const string Key = "workflow.request.started";
             public const int V1 = 1;
         }
     }
