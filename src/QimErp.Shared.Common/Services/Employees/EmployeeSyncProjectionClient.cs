@@ -24,8 +24,8 @@ public sealed class EmployeeSyncProjectionClient(
         PropertyNameCaseInsensitive = true
     };
 
-    public async Task<EmployeeSyncProjection?> GetAsync(Guid employeeId, CancellationToken cancellationToken = default)
-        => await GetProjectionAsync(employeeId, "sync-projection", cancellationToken);
+    public Task<EmployeeSyncProjection?> GetAsync(Guid employeeId, CancellationToken cancellationToken = default)
+        => GetProjectionAsync(employeeId, "sync-projection", cancellationToken);
 
     public async Task<string?> GetDeletionEmailAsync(Guid employeeId, CancellationToken cancellationToken = default)
         => (await GetProjectionAsync(employeeId, "deletion-identity", cancellationToken))?.Email;
