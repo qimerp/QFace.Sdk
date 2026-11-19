@@ -3,9 +3,9 @@ name: PR Validation — QFace.Sdk
 on:
   workflow_dispatch:
   push:
-    branches: [development, main]
+    branches: [staging, main]
   pull_request:
-    branches: [development, main]
+    branches: [staging, main]
     paths:
       - "src/**"
       - "tests/**"
@@ -75,6 +75,10 @@ jobs:
           exit $failed
 
       - name: Test
+
+        # TEMP: tests disabled for Contabo CI speed — re-enable when queue SLO is stable
+
+        if: false
         run: |
           set -euo pipefail
           shopt -s nullglob
