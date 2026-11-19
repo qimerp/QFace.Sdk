@@ -464,6 +464,131 @@ public sealed class Microsoft365GraphClient(
         }
     }
 
+    public async Task<Microsoft365ProfilePhotoResult> TryGetUserProfilePhotoAsync(
+        string tenantId,
+        string companyId,
+        string userPrincipalName,
+        CancellationToken cancellationToken = default)
+    {
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = resolution.Error ?? "Microsoft 365 connection is not available."
+            };
+        }
+
+        if (options is null || !options.EnableSyncProfilePictureFromMicrosoft)
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = "Profile picture sync is not enabled."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(userPrincipalName))
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = "User principal name is required."
+            };
+        }
+
+        try
+        {
+            var token = await AcquireTokenAsync(options, cancellationToken);
+            if (token is null)
+            {
+                return new Microsoft365ProfilePhotoResult
+                {
+                    Succeeded = false,
+                    Error = "Could not obtain a Graph token."
+                };
+            }
+
+            using var client = httpClientFactory.CreateClient("microsoft365-graph");
+            var escapedUpn = Uri.EscapeDataString(userPrincipalName.Trim());
+
+            string? etag = null;
+            using (var metaRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"https://graph.microsoft.com/v1.0/users/{escapedUpn}/photo"))
+            {
+                metaRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                using var metaResponse = await client.SendAsync(metaRequest, cancellationToken);
+                if (metaResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return new Microsoft365ProfilePhotoResult { NotFound = true };
+                }
+
+                if (!metaResponse.IsSuccessStatusCode)
+                {
+                    return new Microsoft365ProfilePhotoResult
+                    {
+                        Succeeded = false,
+                        Error = $"Graph returned {(int)metaResponse.StatusCode} for photo metadata."
+                    };
+                }
+
+                etag = metaResponse.Headers.ETag?.Tag?.Trim('"');
+                if (string.IsNullOrWhiteSpace(etag)
+                    && metaResponse.Content.Headers.TryGetValues("ETag", out var etagValues))
+                {
+                    etag = etagValues.FirstOrDefault()?.Trim('"');
+                }
+            }
+
+            using var photoRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"https://graph.microsoft.com/v1.0/users/{escapedUpn}/photo/$value");
+            photoRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            using var photoResponse = await client.SendAsync(photoRequest, cancellationToken);
+            if (photoResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return new Microsoft365ProfilePhotoResult { NotFound = true };
+            }
+
+            if (!photoResponse.IsSuccessStatusCode)
+            {
+                return new Microsoft365ProfilePhotoResult
+                {
+                    Succeeded = false,
+                    Error = $"Graph returned {(int)photoResponse.StatusCode} for photo content."
+                };
+            }
+
+            var bytes = await photoResponse.Content.ReadAsByteArrayAsync(cancellationToken);
+            if (bytes.Length == 0)
+            {
+                return new Microsoft365ProfilePhotoResult { NotFound = true };
+            }
+
+            var contentType = photoResponse.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = true,
+                Content = bytes,
+                ContentType = contentType,
+                Etag = etag
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Graph profile photo read failed for tenant {TenantId}", tenantId);
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = "Could not read the Microsoft profile photo."
+            };
+        }
+    }
+
     private async Task<string?> AcquireTokenAsync(
         TenantMicrosoft365ResolvedOptions options,
         CancellationToken cancellationToken)

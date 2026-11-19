@@ -14,7 +14,18 @@ public sealed class TenantMicrosoft365ResolvedOptions
     public bool EnableCalendarBlockOnLeave { get; set; }
     public bool EnableTeamsPresenceOnLeave { get; set; }
     public bool EnableTeamsMeetingOnCompanyEvents { get; set; }
+    public bool EnableSyncProfilePictureFromMicrosoft { get; set; }
     public List<string> ConsentedScopes { get; set; } = [];
+}
+
+public sealed class Microsoft365ProfilePhotoResult
+{
+    public bool Succeeded { get; init; }
+    public bool NotFound { get; init; }
+    public byte[]? Content { get; init; }
+    public string? ContentType { get; init; }
+    public string? Etag { get; init; }
+    public string? Error { get; init; }
 }
 
 public sealed class Microsoft365OnlineMeetingResult
@@ -76,5 +87,11 @@ public interface IMicrosoft365GraphClient
         DateTime startUtc,
         DateTime endUtcExclusive,
         bool clear,
+        CancellationToken cancellationToken = default);
+
+    Task<Microsoft365ProfilePhotoResult> TryGetUserProfilePhotoAsync(
+        string tenantId,
+        string companyId,
+        string userPrincipalName,
         CancellationToken cancellationToken = default);
 }
