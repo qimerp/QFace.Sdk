@@ -14,7 +14,18 @@ public sealed class TenantMicrosoft365ResolvedOptions
     public bool EnableCalendarBlockOnLeave { get; set; }
     public bool EnableTeamsPresenceOnLeave { get; set; }
     public bool EnableTeamsMeetingOnCompanyEvents { get; set; }
+    public bool EnableSyncProfilePictureFromMicrosoft { get; set; }
     public List<string> ConsentedScopes { get; set; } = [];
+}
+
+public sealed class Microsoft365ProfilePhotoResult
+{
+    public bool Succeeded { get; init; }
+    public bool NotFound { get; init; }
+    public byte[]? Content { get; init; }
+    public string? ContentType { get; init; }
+    public string? Etag { get; init; }
+    public string? Error { get; init; }
 }
 
 public sealed class Microsoft365OnlineMeetingResult
@@ -33,12 +44,14 @@ public sealed class Microsoft365OofResult
 
 public interface IMicrosoft365GraphClient
 {
-    Task<TenantMicrosoft365ResolvedOptions?> GetTenantOptionsAsync(
+    Task<Microsoft365ConnectionResolution> ResolveConnectionAsync(
         string tenantId,
+        string companyId,
         CancellationToken cancellationToken = default);
 
     Task<Microsoft365OnlineMeetingResult> TryCreateOnlineMeetingAsync(
         string tenantId,
+        string companyId,
         string subject,
         DateTime startUtc,
         DateTime endUtc,
@@ -47,6 +60,7 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365OofResult> TrySetAutomaticRepliesAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtc,
@@ -57,6 +71,7 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365OofResult> TryUpsertLeaveCalendarEventAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         string subject,
         DateTime startUtc,
@@ -67,9 +82,16 @@ public interface IMicrosoft365GraphClient
 
     Task<Microsoft365OofResult> TrySetLeavePresenceAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtcExclusive,
         bool clear,
+        CancellationToken cancellationToken = default);
+
+    Task<Microsoft365ProfilePhotoResult> TryGetUserProfilePhotoAsync(
+        string tenantId,
+        string companyId,
+        string userPrincipalName,
         CancellationToken cancellationToken = default);
 }

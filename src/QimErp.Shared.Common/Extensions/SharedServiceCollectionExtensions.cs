@@ -460,6 +460,12 @@ public static class SharedServiceCollectionExtensions
             services.AddHostedService<RedisCacheDisabledStartupCheck>();
         services.AddHttpClient("microsoft365-graph");
         services.AddHttpClient("microsoft365-token");
+        services.AddHttpClient("microsoft365-catalog", client => client.Timeout = TimeSpan.FromSeconds(20))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddOptions<Microsoft365CatalogOptions>()
+            .Bind(configuration.GetSection(Microsoft365CatalogOptions.SectionName));
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<Microsoft365ConnectionResolver>();
         services.AddScoped<IMicrosoft365GraphClient, Microsoft365GraphClient>();
         services.AddHttpClient("google-calendar");
         services.AddHttpClient("google-oauth");

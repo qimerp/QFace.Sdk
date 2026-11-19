@@ -3,14 +3,14 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
-using QimErp.Shared.Common.Constants;
-using QimErp.Shared.Common.Services.Cache;
+using QimErp.Shared.Common.Services.MultiTenancy;
 
 namespace QimErp.Shared.Common.Integrations.Microsoft365;
 
 public sealed class Microsoft365GraphClient(
-    ISharedDistributedCacheService cache,
+    Microsoft365ConnectionResolver connectionResolver,
     IHttpClientFactory httpClientFactory,
     ILogger<Microsoft365GraphClient> logger) : IMicrosoft365GraphClient
 {
@@ -20,20 +20,25 @@ public sealed class Microsoft365GraphClient(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public Task<TenantMicrosoft365ResolvedOptions?> GetTenantOptionsAsync(
+    public Task<Microsoft365ConnectionResolution> ResolveConnectionAsync(
         string tenantId,
+        string companyId,
         CancellationToken cancellationToken = default) =>
-        cache.GetAsync<TenantMicrosoft365ResolvedOptions>(SharedCacheKeys.TenantMicrosoft365Config(tenantId));
+        connectionResolver.ResolveAsync(tenantId, companyId, cancellationToken);
 
     public async Task<Microsoft365OnlineMeetingResult> TryCreateOnlineMeetingAsync(
         string tenantId,
+        string companyId,
         string subject,
         DateTime startUtc,
         DateTime endUtc,
         string organizerUserPrincipalName,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OnlineMeetingResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableTeamsMeetingOnCompanyEvents)
         {
             return new Microsoft365OnlineMeetingResult
@@ -119,6 +124,7 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365OofResult> TrySetAutomaticRepliesAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtc,
@@ -127,7 +133,10 @@ public sealed class Microsoft365GraphClient(
         bool clear,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OofResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableOutlookOofOnLeave)
         {
             return new Microsoft365OofResult { Succeeded = true, Skipped = true };
@@ -215,6 +224,7 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365OofResult> TryUpsertLeaveCalendarEventAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         string subject,
         DateTime startUtc,
@@ -223,7 +233,10 @@ public sealed class Microsoft365GraphClient(
         bool clear,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OofResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableCalendarBlockOnLeave)
         {
             return new Microsoft365OofResult { Succeeded = true, Skipped = true };
@@ -253,7 +266,8 @@ public sealed class Microsoft365GraphClient(
             using var client = httpClientFactory.CreateClient("microsoft365-graph");
             var iCalUId = string.IsNullOrWhiteSpace(transactionId)
                 ? null
-                : $"qimerp-leave-{transactionId}";
+                : "qimerp-leave-" + Convert.ToHexString(SHA256.HashData(
+                    Encoding.UTF8.GetBytes(string.Join('\n', tenantId, CompanyIdNormalizer.Normalize(companyId), transactionId))));
 
             if (clear)
             {
@@ -355,13 +369,17 @@ public sealed class Microsoft365GraphClient(
 
     public async Task<Microsoft365OofResult> TrySetLeavePresenceAsync(
         string tenantId,
+        string companyId,
         string mailboxUserPrincipalName,
         DateTime startUtc,
         DateTime endUtcExclusive,
         bool clear,
         CancellationToken cancellationToken = default)
     {
-        var options = await GetTenantOptionsAsync(tenantId, cancellationToken);
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+            return new Microsoft365OofResult { Succeeded = false, Error = resolution.Error };
         if (options is null || !options.EnableTeamsPresenceOnLeave)
         {
             return new Microsoft365OofResult { Succeeded = true, Skipped = true };
@@ -442,6 +460,131 @@ public sealed class Microsoft365GraphClient(
             {
                 Succeeded = false,
                 Error = "Teams presence update failed."
+            };
+        }
+    }
+
+    public async Task<Microsoft365ProfilePhotoResult> TryGetUserProfilePhotoAsync(
+        string tenantId,
+        string companyId,
+        string userPrincipalName,
+        CancellationToken cancellationToken = default)
+    {
+        var resolution = await ResolveConnectionAsync(tenantId, companyId, cancellationToken);
+        var options = resolution.Options;
+        if (resolution.Status is Microsoft365ConnectionStatus.Unavailable or Microsoft365ConnectionStatus.Invalid)
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = resolution.Error ?? "Microsoft 365 connection is not available."
+            };
+        }
+
+        if (options is null || !options.EnableSyncProfilePictureFromMicrosoft)
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = "Profile picture sync is not enabled."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(userPrincipalName))
+        {
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = "User principal name is required."
+            };
+        }
+
+        try
+        {
+            var token = await AcquireTokenAsync(options, cancellationToken);
+            if (token is null)
+            {
+                return new Microsoft365ProfilePhotoResult
+                {
+                    Succeeded = false,
+                    Error = "Could not obtain a Graph token."
+                };
+            }
+
+            using var client = httpClientFactory.CreateClient("microsoft365-graph");
+            var escapedUpn = Uri.EscapeDataString(userPrincipalName.Trim());
+
+            string? etag = null;
+            using (var metaRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"https://graph.microsoft.com/v1.0/users/{escapedUpn}/photo"))
+            {
+                metaRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                using var metaResponse = await client.SendAsync(metaRequest, cancellationToken);
+                if (metaResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return new Microsoft365ProfilePhotoResult { NotFound = true };
+                }
+
+                if (!metaResponse.IsSuccessStatusCode)
+                {
+                    return new Microsoft365ProfilePhotoResult
+                    {
+                        Succeeded = false,
+                        Error = $"Graph returned {(int)metaResponse.StatusCode} for photo metadata."
+                    };
+                }
+
+                etag = metaResponse.Headers.ETag?.Tag?.Trim('"');
+                if (string.IsNullOrWhiteSpace(etag)
+                    && metaResponse.Content.Headers.TryGetValues("ETag", out var etagValues))
+                {
+                    etag = etagValues.FirstOrDefault()?.Trim('"');
+                }
+            }
+
+            using var photoRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"https://graph.microsoft.com/v1.0/users/{escapedUpn}/photo/$value");
+            photoRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            using var photoResponse = await client.SendAsync(photoRequest, cancellationToken);
+            if (photoResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return new Microsoft365ProfilePhotoResult { NotFound = true };
+            }
+
+            if (!photoResponse.IsSuccessStatusCode)
+            {
+                return new Microsoft365ProfilePhotoResult
+                {
+                    Succeeded = false,
+                    Error = $"Graph returned {(int)photoResponse.StatusCode} for photo content."
+                };
+            }
+
+            var bytes = await photoResponse.Content.ReadAsByteArrayAsync(cancellationToken);
+            if (bytes.Length == 0)
+            {
+                return new Microsoft365ProfilePhotoResult { NotFound = true };
+            }
+
+            var contentType = photoResponse.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = true,
+                Content = bytes,
+                ContentType = contentType,
+                Etag = etag
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Graph profile photo read failed for tenant {TenantId}", tenantId);
+            return new Microsoft365ProfilePhotoResult
+            {
+                Succeeded = false,
+                Error = "Could not read the Microsoft profile photo."
             };
         }
     }
