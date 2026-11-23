@@ -489,6 +489,55 @@ public class FiscalYearUpdatedEvent : DomainEvent
 }
 
 /// <summary>
+/// Tax group created, updated, activated or deactivated in GL Core; there is no delete, deactivation is <see cref="IsActive"/> false.
+/// </summary>
+public class TaxGroupUpdatedEvent : DomainEvent
+{
+    public Guid TaxGroupId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Sales, Purchases or Both.</summary>
+    public string UseOn { get; set; } = string.Empty;
+
+    /// <summary>Nobody, NewCustomersAndItems or NewCustomersOnly; for a Purchases group "customers" means vendors.</summary>
+    public string DefaultFor { get; set; } = string.Empty;
+
+    public decimal EffectiveRate { get; set; }
+    public bool IsActive { get; set; }
+    public long SourceVersion { get; set; }
+
+    public TaxGroupUpdatedEvent()
+    {
+    }
+
+    public TaxGroupUpdatedEvent(
+        Guid taxGroupId,
+        string code,
+        string name,
+        string useOn,
+        string defaultFor,
+        decimal effectiveRate,
+        bool isActive,
+        long sourceVersion,
+        string tenantId,
+        string? userEmail = null,
+        string? triggeredBy = null,
+        string? userName = null)
+        : base(tenantId, userEmail, triggeredBy, userName)
+    {
+        TaxGroupId = taxGroupId;
+        Code = code;
+        Name = name;
+        UseOn = useOn;
+        DefaultFor = defaultFor;
+        EffectiveRate = effectiveRate;
+        IsActive = isActive;
+        SourceVersion = sourceVersion;
+    }
+}
+
+/// <summary>
 /// Domain event fired when a journal entry is posted
 /// Used by Budget Planning module to sync actuals
 /// </summary>

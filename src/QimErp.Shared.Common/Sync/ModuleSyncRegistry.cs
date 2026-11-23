@@ -269,6 +269,7 @@ public static class ModuleSyncRegistry
         new(SyncType.GlReference, ModuleKeys.Project, "qimerp-operations-project-gl-sync", "Project"),
         new(SyncType.GlReference, ModuleKeys.BudgetPlanning, "qimerp-finance-budget-planning-gl-sync", "BudgetPlanning"),
         new(SyncType.GlReference, ModuleKeys.CashManagement, "qimerp-finance-cash-management-gl-sync", "CashManagement"),
+        new(SyncType.GlReference, ModuleKeys.Inventory, "qimerp-operations-inventory-gl-sync", "Inventory"),
 
         new(SyncType.AssignmentChanged, ModuleKeys.Payroll, "qimerp-payroll-employee-sync", "Payroll"),
 

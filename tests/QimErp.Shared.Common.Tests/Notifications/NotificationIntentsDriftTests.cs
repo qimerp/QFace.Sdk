@@ -58,9 +58,9 @@ public class NotificationIntentsDriftTests
     }
 
     [Fact]
-    public void Lock_CarriesAll50Contracts_IncludingLegacySenderIntents()
+    public void Lock_CarriesAll51Contracts_IncludingLegacySenderAndFinanceIntents()
     {
-        NotificationIntentLock.Contracts.Should().HaveCount(50);
+        NotificationIntentLock.Contracts.Should().HaveCount(51);
         NotificationIntentLock.Contracts.Keys.Should().Contain(
         [
             NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestSubmitted.Key, NotificationIntents.People.LeaveRequestSubmitted.V1),
@@ -93,6 +93,7 @@ public class NotificationIntentsDriftTests
             NotificationIntentLock.Identity(NotificationIntents.Support.TicketAssigned.Key, NotificationIntents.Support.TicketAssigned.V1),
             NotificationIntentLock.Identity(NotificationIntents.Support.TicketQueued.Key, NotificationIntents.Support.TicketQueued.V1),
             NotificationIntentLock.Identity(NotificationIntents.Support.TicketSlaBreached.Key, NotificationIntents.Support.TicketSlaBreached.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Finance.WhtCertificateReady.Key, NotificationIntents.Finance.WhtCertificateReady.V1),
         ]);
     }
 

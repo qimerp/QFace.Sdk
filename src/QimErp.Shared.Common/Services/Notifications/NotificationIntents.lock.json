@@ -7,6 +7,7 @@
     "auth.password.changed@1": "d94c02ee6633f5f3af4a06e7409550a4b3fe9ea7bff7284789fbe6f6ea6644b1",
     "auth.password_reset.requested@1": "69e64559197cb5f9114ef82855291623ce6dc3fb8aaa1e625e8b58f713bf8682",
     "auth.sign_in.succeeded@1": "dee10e182a05fd6d74e2ade86270be4da0f833c6a53cc7e91a4961e8f8a10216",
+    "finance.wht_certificate.ready@1": "a7d1818b2cbbe060eb604c5ff1f2b2e0511371b1bca2f6355f0513c0e539ee07",
     "iam.access_review.reminder@1": "08e1130d9e286db6dc89ce5a69709caec5a9dd00c0c3ba2b053727e8c0cdaefb",
     "iam.audit_follow_up.assigned@1": "afc1abfb9f7a97e0a67aad9b332a6f6b57f5ee42363c04cb8f8b066199cc6d63",
     "operator.account_manager.assigned@1": "0b422122570cfff73d5b768d15192e2100c1e2d0afdf2463a196c8475c05ca8e",
@@ -51,5 +52,5 @@
     "workflow.request.stage_advanced@1": "f71d070f6c6963c4ef2a4d28092bc99b6fb48ee268e8f9c845a12b7f013ebb79",
     "workflow.request.started@1": "c47ef78727c50ceeef7b3556d23db7687720c3c65ce3c14c125406de36da4403"
   },
-  "revision": "fbf9e874f6a16c5b7185fc83735cec4662afbf8cb56d1e60f7a5497e32a8c84e"
+  "revision": "a56e59754fb108b908335f1d930a4d8c393a6fdd13aead2077dea614887905ba"
 }
