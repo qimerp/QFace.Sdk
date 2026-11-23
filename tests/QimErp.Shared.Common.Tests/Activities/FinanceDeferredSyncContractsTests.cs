@@ -1,5 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
+using QimErp.Shared.Common.Activities.CompanyProfile;
 using QimErp.Shared.Common.Activities.Gl;
 using QimErp.Shared.Common.Activities.Inventory;
 using QimErp.Shared.Common.Activities.WorkspaceLinks;
@@ -25,7 +26,8 @@ public sealed class FinanceDeferredSyncContractsTests
     {
         typeof(ProductTaxGroupSyncRequest),
         typeof(WorkspaceLinkCommand),
-        typeof(WorkspaceLinkChanged)
+        typeof(WorkspaceLinkChanged),
+        typeof(CompanyProfileChanged)
     };
 
     [Theory]
@@ -108,6 +110,33 @@ public sealed class FinanceDeferredSyncContractsTests
         restored.Should().BeEquivalentTo(changed);
         restored.CounterpartyTenantId.Should().BeNull();
         restored.Purpose.Should().Be("intercompany");
+    }
+
+    [Fact]
+    public void Company_profile_sync_names_are_pinned_and_payload_round_trips()
+    {
+        typeof(ICompanyProfileSyncWorkflow).GetCustomAttribute<WorkflowAttribute>()!.Name.Should().Be("CompanyProfileSyncWorkflow");
+        CompanyProfileSync.TaskQueue.Should().Be("qimerp-finance-company-profile-sync");
+        ActivityName(typeof(ICompanyProfileSyncActivity)).Should().Be("SyncCompanyProfile:Accounting");
+        ModuleSyncRegistry.FilterByInstalled(SyncType.CompanyProfile, [ModuleKeys.CoreAccounting])
+            .Should().ContainSingle()
+            .Which.Should().Match<SyncSubscription>(s => s.TaskQueue == CompanyProfileSync.TaskQueue && s.ActivitySuffix == "Accounting");
+        ModuleSyncRegistry.FilterByInstalled(SyncType.CompanyProfile, [ModuleKeys.CoreHR]).Should().BeEmpty();
+
+        var change = new CompanyProfileChanged
+        {
+            TenantId = "tenant-a", CompanyId = Guid.NewGuid(), IsDefault = true, Code = "ACME", LegalName = "Acme Ghana Limited",
+            TradingName = "Acme", Tin = "C0001234567", RegistrationNumber = "CS-1", AddressLines = ["1 Ring Road", "Osu"],
+            City = "Accra", Region = "Greater Accra", Country = "Ghana", CountryCode = "GH", Phone = "+233302000000",
+            Email = "accounts@acme.example", Website = "https://acme.example", LogoFileId = Guid.NewGuid(), SourceVersion = 3
+        };
+        var restored = RoundTrip(change);
+        restored.Should().BeEquivalentTo(change);
+        restored.IsActive.Should().BeTrue();
+        restored.VatNumber.Should().BeNull();
+        CompanyProfileSync.WorkflowId("tenant-a", change.CompanyId, 3)
+            .Should().NotBe(CompanyProfileSync.WorkflowId("tenant-b", change.CompanyId, 3))
+            .And.NotBe(CompanyProfileSync.WorkflowId("tenant-a", change.CompanyId, 4));
     }
 
     private static string ActivityName(Type activity) =>

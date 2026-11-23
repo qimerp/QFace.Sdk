@@ -1,3 +1,4 @@
+using QimErp.Shared.Common.Activities.CompanyProfile;
 using QimErp.Shared.Common.TenantSetup;
 
 namespace QimErp.Shared.Common.Sync;
@@ -279,6 +280,8 @@ public static class ModuleSyncRegistry
         new(SyncType.TenantReference, ModuleKeys.Payroll, "qimerp-payroll-tenant-reference-sync", "Payroll"),
         new(SyncType.TenantReference, ModuleKeys.Leave, "qimerp-leave-tenant-reference-sync", "Leave"),
         new(SyncType.TenantReference, ModuleKeys.CoreAccounting, "qimerp-finance-tenant-reference-sync", "Accounting"),
+
+        new(SyncType.CompanyProfile, ModuleKeys.CoreAccounting, CompanyProfileSync.TaskQueue, "Accounting"),
 
         new(SyncType.StockIssue, ModuleKeys.Inventory, "qimerp-inventory-stock-issue-sync", "Inventory"),
         new(SyncType.Customer, ModuleKeys.Inventory, "qimerp-inventory-customer-sync", "Inventory"),
