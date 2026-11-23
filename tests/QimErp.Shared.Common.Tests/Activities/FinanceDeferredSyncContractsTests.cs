@@ -133,7 +133,6 @@ public sealed class FinanceDeferredSyncContractsTests
         var restored = RoundTrip(change);
         restored.Should().BeEquivalentTo(change);
         restored.IsActive.Should().BeTrue();
-        restored.VatNumber.Should().BeNull();
         CompanyProfileSync.WorkflowId("tenant-a", change.CompanyId, 3)
             .Should().NotBe(CompanyProfileSync.WorkflowId("tenant-b", change.CompanyId, 3))
             .And.NotBe(CompanyProfileSync.WorkflowId("tenant-a", change.CompanyId, 4));

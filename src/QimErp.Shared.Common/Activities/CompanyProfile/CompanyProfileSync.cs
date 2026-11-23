@@ -32,7 +32,7 @@ public class CompanyProfileChanged
     public string TradingName { get; set; } = string.Empty;
     public string? Tin { get; set; }
 
-    /// <summary>Null until Platform holds a VAT number separate from <see cref="Tin"/>.</summary>
+    /// <summary>Same as <see cref="Tin"/> until Platform holds a separate VAT number (Ghana VAT registration uses the TIN).</summary>
     public string? VatNumber { get; set; }
 
     public string? RegistrationNumber { get; set; }
@@ -46,7 +46,7 @@ public class CompanyProfileChanged
     public string? Email { get; set; }
     public string? Website { get; set; }
 
-    /// <summary>A permanent https URL, set only when the company logo is one; never a presigned link.</summary>
+    /// <summary>Permanent public https URL of the logo (PNG, JPEG or WebP); never a presigned link. Null when Platform could not publish one.</summary>
     public string? LogoUrl { get; set; }
 
     /// <summary>Platform's stored logo file; the bytes are not readable from Accounting.</summary>
