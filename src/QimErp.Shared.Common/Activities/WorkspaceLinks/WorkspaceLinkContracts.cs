@@ -64,6 +64,7 @@ public class WorkspaceLinkCommand
 /// <summary>
 /// Platform → Accounting status of one link as seen by <see cref="TenantId"/>. The counterparty's tenant id is set only once
 /// the link is accepted; before that an inbound row carries only the inviter's name and domain.
+/// On Status=Revoked consumers update only status, version and responded-at; other fields may be defaults.
 /// </summary>
 public class WorkspaceLinkChanged
 {
