@@ -10,5 +10,6 @@ public enum EntityReferenceType
     Vendor,
     Customer,
     Project,
-    Other
+    Other,
+    LoanApplicant
 }
