@@ -172,6 +172,9 @@ public class FileUploadService : IFileUploadService
         return false;
     }
 
+    // SigV4 links cannot outlive seven days; asking for longer makes AWSSDK fall back to SigV2, which R2 rejects.
+    public const int MaxPresignMinutes = 7 * 24 * 60 - 60;
+
     public Task<string> GetPreSignedUrlAsync(string fileKey, int expirationMinutes = 15)
     {
         string? s3Key = null;
@@ -188,7 +191,7 @@ public class FileUploadService : IFileUploadService
             {
                 BucketName = _bucketName,
                 Key = s3Key,
-                Expires = DateTime.UtcNow.AddMinutes(expirationMinutes),
+                Expires = DateTime.UtcNow.AddMinutes(Math.Min(expirationMinutes, MaxPresignMinutes)),
                 Protocol = Protocol.HTTPS,
                 Verb = HttpVerb.GET
             };
@@ -232,7 +235,7 @@ public class FileUploadService : IFileUploadService
             {
                 BucketName = _bucketName,
                 Key = s3Key,
-                Expires = DateTime.UtcNow.AddMinutes(expirationMinutes),
+                Expires = DateTime.UtcNow.AddMinutes(Math.Min(expirationMinutes, MaxPresignMinutes)),
                 Protocol = Protocol.HTTPS,
                 Verb = HttpVerb.PUT,
                 ContentType = contentType
