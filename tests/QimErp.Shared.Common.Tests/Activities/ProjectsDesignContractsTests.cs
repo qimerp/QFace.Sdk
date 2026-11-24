@@ -21,7 +21,8 @@ public sealed class ProjectsDesignContractsTests
     {
         typeof(ProjectBillInvoiceSyncRequest),
         typeof(ProjectCostGlPostingRequest),
-        typeof(ProjectCostGlPostedRequest)
+        typeof(ProjectCostGlPostedRequest),
+        typeof(ProjectBillSyncRequest)
     };
 
     [Theory]
@@ -157,8 +158,10 @@ public sealed class ProjectsDesignContractsTests
         generated.PaymentTermDays = 45;
         generated.PeriodLabel = "Nov 2026";
 
-        var restored = RoundTrip(new ProjectBillSyncRequest { TenantId = "tenant-a", Generated = generated }).Generated;
+        var request = RoundTrip(new ProjectBillSyncRequest { TenantId = "tenant-a", CompanyId = "company-1", Generated = generated });
+        var restored = request.Generated;
 
+        request.CompanyId.Should().Be("company-1");
         restored.Should().BeEquivalentTo(generated, o => o.Excluding(e => e.OccurredOn));
         restored.Lines.Single().IsHours.Should().BeTrue();
     }
@@ -173,7 +176,10 @@ public sealed class ProjectsDesignContractsTests
             Generated = new { BillId = Guid.NewGuid(), BillNumber = "PB-1", Lines = new[] { new { LineId = Guid.NewGuid(), Quantity = 2m } } }
         });
 
-        var restored = converter.ToValue<ProjectBillSyncRequest>(legacy).Generated;
+        var legacyRequest = converter.ToValue<ProjectBillSyncRequest>(legacy);
+        var restored = legacyRequest.Generated;
+
+        legacyRequest.CompanyId.Should().BeEmpty();
 
         restored.ContractId.Should().BeNull();
         restored.PaymentTermDays.Should().BeNull();
