@@ -15,6 +15,15 @@ public class PurchaseOrderOnOrderData
     public DateTime OrderDate { get; set; }
     public long? WarehouseId { get; set; }
     public List<PurchaseOrderOnOrderLineData> Lines { get; set; } = [];
+
+    /// <summary>Payloads without an action are <see cref="PurchaseOrderOnOrderAction.Opened"/>.</summary>
+    public PurchaseOrderOnOrderAction Action { get; set; } = PurchaseOrderOnOrderAction.Opened;
+}
+
+public enum PurchaseOrderOnOrderAction
+{
+    Opened = 0,
+    Released = 1
 }
 
 public class PurchaseOrderOnOrderLineData

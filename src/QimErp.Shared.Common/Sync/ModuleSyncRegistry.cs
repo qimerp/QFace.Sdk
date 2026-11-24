@@ -85,7 +85,9 @@ public static class ModuleSyncRegistry
             ["SetupCashManagementTenant"],
             RequiresItemKey: "core-accounting",
             PrerequisiteItemKeys: ["core-accounting"]),
-        new("inventory", ModuleKeys.Inventory, ["SetupOperationsInventoryTenant"], SampleSeedStep: "SeedSampleInventory"),
+        new("inventory", ModuleKeys.Inventory, ["SetupOperationsInventoryTenant"],
+            EmployeeBackfillStep: "EnsureEmployeeInInventory",
+            SampleSeedStep: "SeedSampleInventory"),
         new("pos", ModuleKeys.POS, ["SetupPosTenant"], RequiresItemKey: "inventory", PrerequisiteItemKeys: ["inventory"], SampleSeedStep: "SeedSamplePos"),
         new("project", ModuleKeys.Project,
             ["SetupOperationsProjectTenant"],
@@ -201,6 +203,7 @@ public static class ModuleSyncRegistry
         new("EnsureEmployeeInRecruitment", "qimerp-recruitment-tenant-setup"),
         new("EnsureEmployeeInSurveys", "qimerp-surveys-tenant-setup"),
         new("EnsureEmployeeInProject", "qimerp-operations-project-employee-sync"),
+        new("EnsureEmployeeInInventory", "qimerp-operations-project-employee-sync"),
         new("EnsureEmployeeInCashManagement", "qimerp-finance-cash-management-employee-sync"),
 
         // Plugin enable/disable — dispatched to the owning module's existing setup queue,
@@ -253,6 +256,7 @@ public static class ModuleSyncRegistry
         new(SyncType.Employee, ModuleKeys.Surveys, "qimerp-surveys-employee-sync", "Surveys"),
         new(SyncType.Employee, null, "qimerp-platform-employee-sync", "IAM", RequiresModuleSelection: false),
         new(SyncType.Employee, ModuleKeys.Project, "qimerp-operations-project-employee-sync", "Project"),
+        new(SyncType.Employee, ModuleKeys.Inventory, "qimerp-operations-project-employee-sync", "Inventory"),
         new(SyncType.Employee, ModuleKeys.CoreAccounting, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
         new(SyncType.Employee, null, "qimerp-platform-tenantbilling-employee-sync", "TenantBilling", RequiresModuleSelection: false),
 

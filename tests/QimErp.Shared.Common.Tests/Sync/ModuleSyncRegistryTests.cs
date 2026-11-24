@@ -61,6 +61,23 @@ public class ModuleSyncRegistryTests
     }
 
     [Fact]
+    public void ResolveEmployeeBackfillStep_InventoryRoutesToOperationsEmployeeSync()
+    {
+        ModuleSyncRegistry.ResolveEmployeeBackfillStep("inventory").Should().Be("EnsureEmployeeInInventory");
+
+        var subscription = ModuleSyncRegistry.TryResolveEmployeeBackfillStep("EnsureEmployeeInInventory");
+        subscription.Should().NotBeNull();
+        subscription!.ModuleKey.Should().Be(ModuleKeys.Inventory);
+        subscription.TaskQueue.Should().Be("qimerp-operations-project-employee-sync");
+        ModuleSyncRegistry.ResolveSetupStepQueue("EnsureEmployeeInInventory")
+            .Should().Be("qimerp-operations-project-employee-sync");
+        EmployeeSyncV2Modules.UsesV2(subscription.ActivitySuffix).Should().BeTrue();
+
+        ModuleSyncRegistry.FilterByInstalled(SyncType.Employee, [ModuleKeys.CoreHR])
+            .Should().NotContain(s => s.ModuleKey == ModuleKeys.Inventory);
+    }
+
+    [Fact]
     public void FilterByInstalled_GlReference_RequiresModuleInstall()
     {
         var modules = new List<string> { ModuleKeys.CoreAccounting, ModuleKeys.Project };

@@ -27,7 +27,8 @@ public sealed class FinanceDeferredSyncContractsTests
         typeof(ProductTaxGroupSyncRequest),
         typeof(WorkspaceLinkCommand),
         typeof(WorkspaceLinkChanged),
-        typeof(CompanyProfileChanged)
+        typeof(CompanyProfileChanged),
+        typeof(InventoryGoodsReceiptSyncRequest)
     };
 
     [Theory]
@@ -136,6 +137,46 @@ public sealed class FinanceDeferredSyncContractsTests
         CompanyProfileSync.WorkflowId("tenant-a", change.CompanyId, 3)
             .Should().NotBe(CompanyProfileSync.WorkflowId("tenant-b", change.CompanyId, 3))
             .And.NotBe(CompanyProfileSync.WorkflowId("tenant-a", change.CompanyId, 4));
+    }
+
+    [Fact]
+    public void Inventory_goods_receipt_sync_names_are_pinned_and_payload_round_trips()
+    {
+        typeof(IInventoryGoodsReceiptSyncWorkflow).GetCustomAttribute<WorkflowAttribute>()!.Name.Should().Be("InventoryGoodsReceiptSyncWorkflow");
+        InventoryGoodsReceiptSync.WorkflowTaskQueue.Should().Be("qimerp-operations-inventory-goods-receipt-sync");
+        InventoryGoodsReceiptSync.ActivityTaskQueue.Should().Be("qimerp-finance-ap-inventory-goods-receipt-sync");
+        ActivityName(typeof(IInventoryGoodsReceiptSyncActivity)).Should().Be("SyncInventoryGoodsReceipt:Finance");
+
+        var request = new InventoryGoodsReceiptSyncRequest
+        {
+            TenantId = "tenant-a",
+            Receipt = new InventoryGoodsReceiptData
+            {
+                GoodsReceiptId = Guid.NewGuid(), ReceiptNumber = "GR-0001", PurchaseOrderId = Guid.NewGuid(), VendorId = "vendor-1",
+                ReceiptDate = new DateTime(2026, 11, 24, 0, 0, 0, DateTimeKind.Utc),
+                Lines = [new InventoryGoodsReceiptLineData { PurchaseOrderLineId = Guid.NewGuid(), ProductId = "product-1", Quantity = 12.5m, UnitCost = 3.75m }]
+            }
+        };
+        RoundTrip(request).Should().BeEquivalentTo(request);
+        InventoryGoodsReceiptSync.WorkflowId("tenant-a", request.Receipt.GoodsReceiptId)
+            .Should().NotBe(InventoryGoodsReceiptSync.WorkflowId("tenant-b", request.Receipt.GoodsReceiptId));
+    }
+
+    [Fact]
+    public void On_order_payload_without_action_reads_as_opened_and_released_round_trips()
+    {
+        var converter = DataConverter.Default.PayloadConverter;
+        var legacy = converter.ToPayload(new { TenantId = "tenant-a", OnOrder = new { PurchaseOrderId = Guid.NewGuid(), PurchaseOrderCode = "PO-1" } });
+
+        converter.ToValue<StockOnOrderSyncRequest>(legacy).OnOrder.Action.Should().Be(PurchaseOrderOnOrderAction.Opened);
+        new PurchaseOrderOnOrderData().Action.Should().Be(PurchaseOrderOnOrderAction.Opened);
+
+        var released = new StockOnOrderSyncRequest
+        {
+            TenantId = "tenant-a",
+            OnOrder = new PurchaseOrderOnOrderData { PurchaseOrderId = Guid.NewGuid(), PurchaseOrderCode = "PO-2", Action = PurchaseOrderOnOrderAction.Released }
+        };
+        RoundTrip(released).OnOrder.Action.Should().Be(PurchaseOrderOnOrderAction.Released);
     }
 
     private static string ActivityName(Type activity) =>

@@ -74,6 +74,7 @@ public class SdkData11GuardTests
             "Recruitment",
             "EmployeeEngagement",
             "Project",
+            "Inventory",
             "CashManagement",
         };
 
