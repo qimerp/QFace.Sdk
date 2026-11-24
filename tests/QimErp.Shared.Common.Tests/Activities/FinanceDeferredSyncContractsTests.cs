@@ -179,6 +179,26 @@ public sealed class FinanceDeferredSyncContractsTests
         RoundTrip(released).OnOrder.Action.Should().Be(PurchaseOrderOnOrderAction.Released);
     }
 
+    [Fact]
+    public void On_order_line_unit_price_round_trips_and_reads_as_zero_when_absent()
+    {
+        var converter = DataConverter.Default.PayloadConverter;
+        var legacy = converter.ToPayload(new { TenantId = "tenant-a", OnOrder = new { PurchaseOrderId = Guid.NewGuid(), Lines = new[] { new { LineId = Guid.NewGuid(), ProductId = "product-1", Quantity = 4m } } } });
+
+        converter.ToValue<StockOnOrderSyncRequest>(legacy).OnOrder.Lines.Single().UnitPrice.Should().Be(0m);
+
+        var priced = new StockOnOrderSyncRequest
+        {
+            TenantId = "tenant-a",
+            OnOrder = new PurchaseOrderOnOrderData
+            {
+                PurchaseOrderId = Guid.NewGuid(), PurchaseOrderCode = "PO-3",
+                Lines = [new PurchaseOrderOnOrderLineData { LineId = Guid.NewGuid(), ProductId = "product-1", Quantity = 4m, UnitPrice = 12.35m }]
+            }
+        };
+        RoundTrip(priced).OnOrder.Lines.Single().UnitPrice.Should().Be(12.35m);
+    }
+
     private static string ActivityName(Type activity) =>
         activity.GetMethods().Single().GetCustomAttribute<ActivityAttribute>()!.Name!;
 }

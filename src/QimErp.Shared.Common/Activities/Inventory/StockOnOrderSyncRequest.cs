@@ -33,4 +33,5 @@ public class PurchaseOrderOnOrderLineData
     public string ProductName { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public Guid? PurchaseOrderLineId { get; set; }
+    public decimal UnitPrice { get; set; }
 }
