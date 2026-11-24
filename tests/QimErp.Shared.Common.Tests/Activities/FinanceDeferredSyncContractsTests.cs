@@ -180,12 +180,12 @@ public sealed class FinanceDeferredSyncContractsTests
     }
 
     [Fact]
-    public void On_order_line_unit_price_round_trips_and_reads_as_zero_when_absent()
+    public void On_order_line_unit_price_round_trips_and_reads_as_null_when_absent()
     {
         var converter = DataConverter.Default.PayloadConverter;
         var legacy = converter.ToPayload(new { TenantId = "tenant-a", OnOrder = new { PurchaseOrderId = Guid.NewGuid(), Lines = new[] { new { LineId = Guid.NewGuid(), ProductId = "product-1", Quantity = 4m } } } });
 
-        converter.ToValue<StockOnOrderSyncRequest>(legacy).OnOrder.Lines.Single().UnitPrice.Should().Be(0m);
+        converter.ToValue<StockOnOrderSyncRequest>(legacy).OnOrder.Lines.Single().UnitPrice.Should().BeNull();
 
         var priced = new StockOnOrderSyncRequest
         {

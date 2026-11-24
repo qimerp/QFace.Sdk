@@ -33,5 +33,6 @@ public class PurchaseOrderOnOrderLineData
     public string ProductName { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public Guid? PurchaseOrderLineId { get; set; }
-    public decimal UnitPrice { get; set; }
+    /// <summary>Null when the sender did not sync a price; never read it as zero cost.</summary>
+    public decimal? UnitPrice { get; set; }
 }
