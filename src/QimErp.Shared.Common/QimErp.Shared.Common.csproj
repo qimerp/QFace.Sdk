@@ -30,6 +30,7 @@
     </PropertyGroup>
     
     <ItemGroup>
+        <EmbeddedResource Include="Services/Notifications/Contracts/*.json" LogicalName="QimErp.Shared.Common.NotificationContracts.%(Filename)%(Extension)" />
         <EmbeddedResource Include="Services/Notifications/NotificationIntents.lock.json" LogicalName="QimErp.Shared.Common.NotificationIntents.lock.json" />
     </ItemGroup>
 

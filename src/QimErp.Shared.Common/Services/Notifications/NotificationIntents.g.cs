@@ -4,7 +4,7 @@ namespace QimErp.Shared.Common.Services.Notifications;
 
 public static class NotificationIntents
 {
-    public const string ContractRevision = "a56e59754fb108b908335f1d930a4d8c393a6fdd13aead2077dea614887905ba";
+    public const string ContractRevision = "f8b95deb65430976d216145ded69fcae6655c7c2972730fdb1ce4d0c61b9a274";
 
     public static class AppStore
     {
@@ -17,6 +17,24 @@ public static class NotificationIntents
 
     public static class Auth
     {
+        public static class IdentityAccountLinked
+        {
+            public const string Key = "auth.identity.account_linked";
+            public const int V1 = 1;
+        }
+
+        public static class IdentityExistingLinkInvitation
+        {
+            public const string Key = "auth.identity.existing_link_invitation";
+            public const int V1 = 1;
+        }
+
+        public static class IdentityPendingInvitation
+        {
+            public const string Key = "auth.identity.pending_invitation";
+            public const int V1 = 1;
+        }
+
         public static class AccountActivationRequested
         {
             public const string Key = "auth.account.activation_requested";

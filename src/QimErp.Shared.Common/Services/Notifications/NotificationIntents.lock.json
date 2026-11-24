@@ -2,6 +2,9 @@
   "contracts": {
     "app_store.item.installed@1": "457660118aa5bfdf4eaa89b9b32e3e33b626cf0ffdd7d92bd826936fb4ae3d5d",
     "auth.account.activation_requested@1": "00f442269dae96cf0ecd2ff4e1781a3c8bfd883376d48c5ebf02aec9464b9459",
+    "auth.identity.account_linked@1": "c3a0c1cc376e1311ed0071b3c0ef11ba12dea73ef59047dc6e3016317c9aca5c",
+    "auth.identity.existing_link_invitation@1": "baacc68f6624df66566b34e1040e517dfdc610e38efe06b27aa80ac7e7eaa9e5",
+    "auth.identity.pending_invitation@1": "9b9c1d19a72542fdd49edd8c5663d9d9eb3dc81d4ea2e8945c88b38d0cb2222f",
     "auth.mfa.setup_reminder@1": "3fafc19882c1fad3dfdd4463e4f28431b58bc396c7fe7cc16def57f8092a53f6",
     "auth.password.admin_reset@1": "e2f4c4edd2e92764d8b51c7fb06ae78d0d724a9b5936341dba5c47de7b26cd6b",
     "auth.password.changed@1": "d94c02ee6633f5f3af4a06e7409550a4b3fe9ea7bff7284789fbe6f6ea6644b1",
@@ -52,5 +55,5 @@
     "workflow.request.stage_advanced@1": "f71d070f6c6963c4ef2a4d28092bc99b6fb48ee268e8f9c845a12b7f013ebb79",
     "workflow.request.started@1": "c47ef78727c50ceeef7b3556d23db7687720c3c65ce3c14c125406de36da4403"
   },
-  "revision": "a56e59754fb108b908335f1d930a4d8c393a6fdd13aead2077dea614887905ba"
+  "revision": "f8b95deb65430976d216145ded69fcae6655c7c2972730fdb1ce4d0c61b9a274"
 }

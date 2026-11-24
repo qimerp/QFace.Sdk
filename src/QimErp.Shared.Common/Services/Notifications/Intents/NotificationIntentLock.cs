@@ -62,6 +62,22 @@ public static class NotificationIntentLock
         return (revision, new ReadOnlyDictionary<string, string>(contracts));
     }
 
+    public static byte[] ReadContract(string key, int version)
+    {
+        if (version != 1 || key is not ("auth.identity.pending_invitation" or "auth.identity.existing_link_invitation" or "auth.identity.account_linked"))
+            throw new KeyNotFoundException("No canonical contract resource is available for this intent.");
+        using var stream = typeof(NotificationIntentLock).Assembly.GetManifestResourceStream(
+            "QimErp.Shared.Common.NotificationContracts." + key + ".v1.json")
+            ?? throw new InvalidOperationException("Canonical notification contract resource is missing.");
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        if (!TryGetContractSha256(key, version, out var expected)
+            || !string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes)), expected, StringComparison.Ordinal))
+            throw new InvalidOperationException("Canonical notification contract resource does not match its lock.");
+        return bytes;
+    }
+
     public static string Revision { get; }
 
     /// <summary>"key@version" to the lowercase sha256 hex of the locked contract file.</summary>
