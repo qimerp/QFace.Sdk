@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "key": "finance.wht_certificate.ready",
+  "version": 1,
+  "owner": {
+    "domain": "finance",
+    "service": "QimErp.Finance"
+  },
+  "summary": "A withholding or VAT credit certificate was emailed; gives the vendor tax contact a link to view and download it.",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "vendor_tax_contact",
+      "recipient": {
+        "source": "platform",
+        "from": "recipientId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "recipientId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "CertificateNumber",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "WHT-2026-0001"
+    },
+    {
+      "name": "KindLabel",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Withholding tax"
+    },
+    {
+      "name": "PeriodLabel",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "October 2026"
+    },
+    {
+      "name": "AmountLabel",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Confidential",
+      "resolvedAt": "precheck",
+      "example": "GHS 100.00"
+    },
+    {
+      "name": "Message",
+      "type": "text",
+      "required": false,
+      "source": "producer",
+      "sensitivity": "Confidential",
+      "resolvedAt": "precheck",
+      "example": "Example note."
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Sensitive",
+      "resolvedAt": "precheck",
+      "example": "https://finance.example.qimerp.com/example/documents/wht-certificates/Xk2pQ7vRt9LmN4sWb8YcZ1dFg6HjK3aEu5oPi0qTy7w",
+      "resolvedFrom": "finance.appUrl",
+      "url": {
+        "host": "finance-app",
+        "purpose": "finance_app"
+      }
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Tenant",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "TenantInitials",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "ET",
+      "resolvedFrom": "tenant.initials"
+    }
+  ]
+}

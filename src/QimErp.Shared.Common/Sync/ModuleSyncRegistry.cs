@@ -1,3 +1,4 @@
+using QimErp.Shared.Common.Activities.CompanyProfile;
 using QimErp.Shared.Common.TenantSetup;
 
 namespace QimErp.Shared.Common.Sync;
@@ -66,6 +67,7 @@ public static class ModuleSyncRegistry
             SampleSeedStep: "SeedSampleWorkforcePlanning"),
         new("core-accounting", ModuleKeys.CoreAccounting,
             ["SetupAccountingGlTenant"],
+            EmployeeBackfillStep: "EnsureEmployeeInCashManagement",
             AdminDataBackfillStep: "EnsureAdminDataInAccounting"),
         new("accounts-payable", ModuleKeys.AccountsPayable,
             ["SetupAccountingApTenant"],
@@ -82,8 +84,7 @@ public static class ModuleSyncRegistry
         new("cash-management", ModuleKeys.CashManagement,
             ["SetupCashManagementTenant"],
             RequiresItemKey: "core-accounting",
-            PrerequisiteItemKeys: ["core-accounting"],
-            EmployeeBackfillStep: "EnsureEmployeeInCashManagement"),
+            PrerequisiteItemKeys: ["core-accounting"]),
         new("inventory", ModuleKeys.Inventory, ["SetupOperationsInventoryTenant"], SampleSeedStep: "SeedSampleInventory"),
         new("pos", ModuleKeys.POS, ["SetupPosTenant"], RequiresItemKey: "inventory", PrerequisiteItemKeys: ["inventory"], SampleSeedStep: "SeedSamplePos"),
         new("project", ModuleKeys.Project,
@@ -252,7 +253,7 @@ public static class ModuleSyncRegistry
         new(SyncType.Employee, ModuleKeys.Surveys, "qimerp-surveys-employee-sync", "Surveys"),
         new(SyncType.Employee, null, "qimerp-platform-employee-sync", "IAM", RequiresModuleSelection: false),
         new(SyncType.Employee, ModuleKeys.Project, "qimerp-operations-project-employee-sync", "Project"),
-        new(SyncType.Employee, ModuleKeys.CashManagement, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
+        new(SyncType.Employee, ModuleKeys.CoreAccounting, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
         new(SyncType.Employee, null, "qimerp-platform-tenantbilling-employee-sync", "TenantBilling", RequiresModuleSelection: false),
 
         new(SyncType.AdminData, ModuleKeys.CoreHR, "qimerp-corehr-employee-admin-sync", "Employee"),
@@ -269,6 +270,7 @@ public static class ModuleSyncRegistry
         new(SyncType.GlReference, ModuleKeys.Project, "qimerp-operations-project-gl-sync", "Project"),
         new(SyncType.GlReference, ModuleKeys.BudgetPlanning, "qimerp-finance-budget-planning-gl-sync", "BudgetPlanning"),
         new(SyncType.GlReference, ModuleKeys.CashManagement, "qimerp-finance-cash-management-gl-sync", "CashManagement"),
+        new(SyncType.GlReference, ModuleKeys.Inventory, "qimerp-operations-inventory-gl-sync", "Inventory"),
 
         new(SyncType.AssignmentChanged, ModuleKeys.Payroll, "qimerp-payroll-employee-sync", "Payroll"),
 
@@ -279,12 +281,14 @@ public static class ModuleSyncRegistry
         new(SyncType.TenantReference, ModuleKeys.Leave, "qimerp-leave-tenant-reference-sync", "Leave"),
         new(SyncType.TenantReference, ModuleKeys.CoreAccounting, "qimerp-finance-tenant-reference-sync", "Accounting"),
 
+        new(SyncType.CompanyProfile, ModuleKeys.CoreAccounting, CompanyProfileSync.TaskQueue, "Accounting"),
+
         new(SyncType.StockIssue, ModuleKeys.Inventory, "qimerp-inventory-stock-issue-sync", "Inventory"),
         new(SyncType.Customer, ModuleKeys.Inventory, "qimerp-inventory-customer-sync", "Inventory"),
         new(SyncType.Vendor, ModuleKeys.Inventory, "qimerp-inventory-vendor-sync", "Inventory"),
 
         new(SyncType.PersonErasure, ModuleKeys.CoreHR, ModuleSyncWorkflowQueues.PersonErasureParent, "CoreHR"),
-        new(SyncType.PersonErasure, ModuleKeys.CashManagement, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
+        new(SyncType.PersonErasure, ModuleKeys.CoreAccounting, "qimerp-finance-cash-management-employee-sync", "CashManagement"),
         new(SyncType.PersonErasure, ModuleKeys.Workflow, "qimerp-platform-workflow-actor-sync", "Workflow"),
         new(SyncType.PersonErasure, ModuleKeys.Leave, "qimerp-leave-employee-sync", "Leave"),
         new(SyncType.PersonErasure, ModuleKeys.Payroll, "qimerp-payroll-employee-sync", "Payroll"),
