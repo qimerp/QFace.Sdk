@@ -20,6 +20,7 @@ public static class EmployeeSyncV2Modules
         "Recruitment",
         "EmployeeEngagement",
         "Project",
+        "Inventory",
         "CashManagement"
     };
 
