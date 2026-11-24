@@ -149,6 +149,13 @@ public class ProjectBillGeneratedEvent : DomainEvent
     public string CurrencyCode { get; set; } = string.Empty;
     public decimal GrandTotal { get; set; }
     public List<ProjectBillLineData> Lines { get; set; } = [];
+    public Guid? ContractId { get; set; }
+    public string? ContractNumber { get; set; }
+
+    /// <summary>Null on payloads from before 4.4.0; Finance applies its own default term.</summary>
+    public int? PaymentTermDays { get; set; }
+
+    public string? PeriodLabel { get; set; }
 
     public ProjectBillGeneratedEvent()
     {
@@ -221,4 +228,7 @@ public class ProjectBillLineData
     public string? TaskNumber { get; set; }
     public Guid? ExpenditureId { get; set; }
     public Guid? TimeEntryId { get; set; }
+
+    /// <summary>True when <see cref="Quantity"/> is hours and <see cref="UnitPrice"/> an hourly rate.</summary>
+    public bool IsHours { get; set; }
 }

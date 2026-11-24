@@ -121,6 +121,22 @@ public class ModuleSyncRegistryTests
     }
 
     [Fact]
+    public void FilterByInstalled_Customer_ProjectRoutesToOperationsCustomerSync()
+    {
+        var withProject = ModuleSyncRegistry.FilterByInstalled(
+            SyncType.Customer,
+            [ModuleKeys.AccountsReceivable, ModuleKeys.Project]);
+        withProject.Should().ContainSingle(s => s.ModuleKey == ModuleKeys.Project);
+        withProject[0].TaskQueue.Should().Be("qimerp-inventory-customer-sync");
+        withProject[0].ActivitySuffix.Should().Be("Project");
+
+        var withBoth = ModuleSyncRegistry.FilterByInstalled(
+            SyncType.Customer,
+            [ModuleKeys.Inventory, ModuleKeys.Project]);
+        withBoth.Select(s => s.ActivitySuffix).Should().BeEquivalentTo(["Inventory", "Project"]);
+    }
+
+    [Fact]
     public void FilterByInstalled_Vendor_InventoryOnlyWhenSelected()
     {
         var withInventory = ModuleSyncRegistry.FilterByInstalled(
