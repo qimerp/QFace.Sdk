@@ -18,6 +18,10 @@ public static class ProjectCostGlPosted
 public class ProjectCostGlPostedRequest
 {
     public string TenantId { get; set; } = string.Empty;
+
+    /// <summary>Top level so the activity interceptor scopes the consumer to this company; empty means tenant-wide.</summary>
+    public string CompanyId { get; set; } = string.Empty;
+
     public Guid ExpenditureId { get; set; }
     public bool Succeeded { get; set; }
     public Guid? JournalEntryId { get; set; }

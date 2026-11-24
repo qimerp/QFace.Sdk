@@ -36,6 +36,18 @@ public sealed class ProjectsDesignContractsTests
         property.GetValue(Activator.CreateInstance(type)).Should().Be(string.Empty);
     }
 
+    [Theory]
+    [MemberData(nameof(TemporalRequestTypes))]
+    public void Every_new_request_carries_a_top_level_non_null_string_company(Type type)
+    {
+        var property = type.GetProperty("CompanyId", BindingFlags.Public | BindingFlags.Instance);
+
+        property.Should().NotBeNull();
+        property!.PropertyType.Should().Be(typeof(string));
+        new NullabilityInfoContext().Create(property).WriteState.Should().Be(NullabilityState.NotNull);
+        property.GetValue(Activator.CreateInstance(type)).Should().Be(string.Empty);
+    }
+
     [Fact]
     public void Bill_invoice_sync_names_are_pinned_and_payload_round_trips()
     {
@@ -47,6 +59,7 @@ public sealed class ProjectsDesignContractsTests
         var request = new ProjectBillInvoiceSyncRequest
         {
             TenantId = "tenant-a",
+            CompanyId = "company-1",
             BillId = Guid.NewGuid(),
             InvoiceId = Guid.NewGuid(),
             InvoiceCode = "INV-00012",
@@ -77,6 +90,7 @@ public sealed class ProjectsDesignContractsTests
         var request = new ProjectCostGlPostingRequest
         {
             TenantId = "tenant-a",
+            CompanyId = "company-1",
             ExpenditureId = Guid.NewGuid(),
             ExpenditureNumber = "EXP-00042",
             ProjectId = Guid.NewGuid(),
@@ -107,6 +121,7 @@ public sealed class ProjectsDesignContractsTests
         var posted = new ProjectCostGlPostedRequest
         {
             TenantId = "tenant-a",
+            CompanyId = "company-1",
             ExpenditureId = Guid.NewGuid(),
             Succeeded = true,
             JournalEntryId = Guid.NewGuid(),
@@ -118,12 +133,14 @@ public sealed class ProjectsDesignContractsTests
         var failed = new ProjectCostGlPostedRequest
         {
             TenantId = "tenant-a",
+            CompanyId = "company-1",
             ExpenditureId = posted.ExpenditureId,
             Succeeded = false,
             ErrorCode = ProjectCostGlPostingErrors.PeriodClosed,
             ErrorMessage = "The accounting period is closed."
         };
         RoundTrip(failed).Should().BeEquivalentTo(failed);
+        RoundTrip(failed).CompanyId.Should().Be("company-1");
         ProjectCostGlPosted.WorkflowId("tenant-a", posted.ExpenditureId)
             .Should().NotBe(ProjectCostGlPosted.WorkflowId("tenant-b", posted.ExpenditureId));
     }

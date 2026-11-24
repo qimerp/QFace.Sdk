@@ -18,6 +18,10 @@ public static class ProjectBillInvoiceSync
 public class ProjectBillInvoiceSyncRequest
 {
     public string TenantId { get; set; } = string.Empty;
+
+    /// <summary>Top level so the activity interceptor scopes the consumer to this company; empty means tenant-wide.</summary>
+    public string CompanyId { get; set; } = string.Empty;
+
     public Guid BillId { get; set; }
     public Guid InvoiceId { get; set; }
     public string InvoiceCode { get; set; } = string.Empty;

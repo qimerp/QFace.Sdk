@@ -25,6 +25,10 @@ public static class ProjectCostGlPostingErrors
 public class ProjectCostGlPostingRequest
 {
     public string TenantId { get; set; } = string.Empty;
+
+    /// <summary>Top level so the activity interceptor scopes the consumer to this company; empty means tenant-wide.</summary>
+    public string CompanyId { get; set; } = string.Empty;
+
     public Guid ExpenditureId { get; set; }
     public string ExpenditureNumber { get; set; } = string.Empty;
     public Guid ProjectId { get; set; }
