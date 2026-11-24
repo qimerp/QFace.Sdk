@@ -8,10 +8,18 @@ work=$(mktemp -d)
 packages_root="${NUGET_PACKAGES:-$HOME/.nuget/packages}"
 build_flags=(-m:1 -nodeReuse:false -p:UseSharedCompilation=false)
 
+dependency_caches=()
+for dependency in QFace.Sdk.BlobStorage QFace.Sdk.Temporal; do
+  dependency_version=$(dotnet msbuild "$sdk_root/src/$dependency/$dependency.csproj" -getProperty:Version -nologo)
+  dependency_cache="$packages_root/$(tr '[:upper:]' '[:lower:]' <<<"$dependency")/$dependency_version"
+  [[ -d "$dependency_cache" ]] || dependency_caches+=("$dependency_cache")
+done
+
 cleanup() {
   rm -rf "$work" \
     "$packages_root/qimerp.shared.common/$version" \
-    "$packages_root/qimerp.shared.common.testing/$version"
+    "$packages_root/qimerp.shared.common.testing/$version" \
+    ${dependency_caches[@]+"${dependency_caches[@]}"}
 }
 trap cleanup EXIT
 
@@ -42,7 +50,8 @@ if git -C "$sdk_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 && git -C 
 fi
 
 echo "Packing $version..."
-for project in QimErp.Shared.Common QimErp.Shared.Common.Testing; do
+# Shared.Common's project references go in the feed too, so a version bump not yet on nuget.org still restores.
+for project in QFace.Sdk.BlobStorage QFace.Sdk.Temporal QimErp.Shared.Common QimErp.Shared.Common.Testing; do
   dotnet pack "$sdk_root/src/$project/$project.csproj" -c Release -o "$work/feed" \
     -p:QimErpSharedCommonVersion="$version" "${build_flags[@]}" -nologo -v q >"$work/pack-$project.log" 2>&1 \
     || { cat "$work/pack-$project.log" >&2; fail "dotnet pack $project"; }
