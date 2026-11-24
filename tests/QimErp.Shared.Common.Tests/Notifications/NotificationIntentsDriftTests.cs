@@ -45,6 +45,16 @@ public class NotificationIntentsDriftTests
         var files = Directory.GetFiles(Path.Combine(NotificationFixtures.Root, "intents"), "*.json");
         files.Should().HaveCount(NotificationIntentLock.Contracts.Count);
 
+        foreach (var identity in new[] { "auth.identity.pending_invitation", "auth.identity.existing_link_invitation", "auth.identity.account_linked" })
+        {
+            var canonical = NotificationIntentLock.ReadContract(identity, 1);
+            canonical.Should().Equal(File.ReadAllBytes(Path.Combine(NotificationFixtures.Root, "intents", identity + ".v1.json")));
+            canonical[0] = 0;
+            NotificationIntentLock.ReadContract(identity, 1)[0].Should().Be((byte)'{');
+        }
+        Action unknown = () => NotificationIntentLock.ReadContract("auth.identity.unknown", 1);
+        unknown.Should().Throw<KeyNotFoundException>();
+
         foreach (var file in files)
         {
             var name = Path.GetFileNameWithoutExtension(file);
@@ -58,9 +68,9 @@ public class NotificationIntentsDriftTests
     }
 
     [Fact]
-    public void Lock_CarriesAll50Contracts_IncludingLegacySenderIntents()
+    public void Lock_CarriesAll53Contracts_IncludingIdentityInvitations()
     {
-        NotificationIntentLock.Contracts.Should().HaveCount(50);
+        NotificationIntentLock.Contracts.Should().HaveCount(53);
         NotificationIntentLock.Contracts.Keys.Should().Contain(
         [
             NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestSubmitted.Key, NotificationIntents.People.LeaveRequestSubmitted.V1),

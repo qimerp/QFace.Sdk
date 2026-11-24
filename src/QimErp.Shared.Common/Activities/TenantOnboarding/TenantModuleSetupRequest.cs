@@ -2,6 +2,7 @@ namespace QimErp.Shared.Common.Activities.TenantOnboarding;
 
 public class TenantModuleSetupRequest
 {
+    public FounderIdentityRequest? FounderIdentity { get; set; }
     public string Action { get; set; } = ""; // EnsureSubscription | SetupTenant | CreateFirstEmployee | SyncEmployee
     public string TenantId { get; set; } = "";
     public string? Company { get; set; }

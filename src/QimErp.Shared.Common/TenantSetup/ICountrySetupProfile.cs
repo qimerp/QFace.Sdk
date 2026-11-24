@@ -2,6 +2,8 @@ namespace QimErp.Shared.Common.TenantSetup;
 
 public interface ICountrySetupProfile
 {
+    bool SupportsOperationalSetup => false;
+
     string CountryCode { get; }           // ISO 3166-1 alpha-2: "GH", "NG", "KE"
     string CountryName { get; }
     string Currency { get; }              // "GHS", "NGN", "KES"

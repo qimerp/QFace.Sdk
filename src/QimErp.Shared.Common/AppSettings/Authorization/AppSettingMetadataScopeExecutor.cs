@@ -26,6 +26,7 @@ public interface IAppSettingMetadataQueryContext : IScopedQueryFilterContext
 public static class AppSettingMetadataPolicy
 {
     public const string Microsoft365OwnerManagement = "Microsoft365OwnerManagement";
+    public const string IdentityOwnerManagement = "IdentityOwnerManagement";
     internal const string Category = "Microsoft365Integration";
     internal static readonly string[] Keys = ["microsoft365.graph_config", "microsoft365.company_graph_config",
         "microsoft365.sign_in_binding", "microsoft365.company_sign_in_binding"];
@@ -33,7 +34,7 @@ public static class AppSettingMetadataPolicy
 
 public sealed class AppSettingMetadataScopeExecutor(IAppSettingMetadataAuthorizer authorizer, ITenantContext tenantContext, ICurrentUserService currentUser, TimeProvider? timeProvider = null)
 {
-    private sealed record Capability(string ActorId, string TenantId, string WriteCompanyId,
+    private sealed record Capability(string PolicyName, string ActorId, string TenantId, string WriteCompanyId,
         string[] ReadCompanyIds, AppSettingMetadataOperation Operation, DateTimeOffset Expires,
         ITenantContext TenantContext, ICurrentUserService User, TimeProvider Clock)
     {
@@ -55,24 +56,27 @@ public sealed class AppSettingMetadataScopeExecutor(IAppSettingMetadataAuthorize
     }
     public static string CurrentActorId => Current?.ActorId ?? string.Empty;
     public static bool IsAuthorizedTarget(string tenantId, string? targetCompanyId, bool requireWrite = false) =>
-        Current is { } c && c.TenantId == tenantId && c.WriteCompanyId == (targetCompanyId ?? string.Empty)
+        Current is { PolicyName: AppSettingMetadataPolicy.Microsoft365OwnerManagement } c && c.TenantId == tenantId && c.WriteCompanyId == (targetCompanyId ?? string.Empty)
         && (!requireWrite || c.Operation == AppSettingMetadataOperation.Write);
     public static bool CanAuthorizeSessionRevocation(string tenantId, string? targetCompanyId) =>
-        Current is { Operation: AppSettingMetadataOperation.Write } c && c.TenantId == tenantId
+        Current is { Operation: AppSettingMetadataOperation.Write } c
+        && (c.PolicyName is AppSettingMetadataPolicy.Microsoft365OwnerManagement or AppSettingMetadataPolicy.IdentityOwnerManagement)
+        && c.TenantId == tenantId
         && c.WriteCompanyId == (targetCompanyId ?? string.Empty);
     public static string CurrentTenantId => Current?.TenantId ?? string.Empty;
-    public static string CurrentCategory => Current is null ? string.Empty : AppSettingMetadataPolicy.Category;
-    public static string[] CurrentKeys => Current is null ? [] : AppSettingMetadataPolicy.Keys.ToArray();
-    public static bool CurrentReadAllCompanies => Current is not null;
-    public static string[] CurrentReadCompanyIds => Current?.ReadCompanyIds.ToArray() ?? [];
+    public static string CurrentCategory => Current is { PolicyName: AppSettingMetadataPolicy.Microsoft365OwnerManagement } ? AppSettingMetadataPolicy.Category : string.Empty;
+    public static string[] CurrentKeys => Current is { PolicyName: AppSettingMetadataPolicy.Microsoft365OwnerManagement } ? AppSettingMetadataPolicy.Keys.ToArray() : [];
+    public static bool CurrentReadAllCompanies => Current is { PolicyName: AppSettingMetadataPolicy.Microsoft365OwnerManagement };
+    public static string[] CurrentReadCompanyIds => Current is { PolicyName: AppSettingMetadataPolicy.Microsoft365OwnerManagement } c ? c.ReadCompanyIds.ToArray() : [];
 
     public async Task<T> RunAsync<T>(string policyName, AppSettingMetadataOperation operation,
         string? targetCompanyId, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
         if (Ambient.Value is not null) throw new UnauthorizedAccessException("Nested metadata operations are not allowed.");
-        if (policyName != AppSettingMetadataPolicy.Microsoft365OwnerManagement)
+        if (policyName != AppSettingMetadataPolicy.Microsoft365OwnerManagement && policyName != AppSettingMetadataPolicy.IdentityOwnerManagement)
             throw new UnauthorizedAccessException("Unknown settings metadata policy.");
-        if (!Enum.IsDefined(operation)) throw new UnauthorizedAccessException("Unknown metadata operation.");
+        if (!Enum.IsDefined(operation) || policyName == AppSettingMetadataPolicy.IdentityOwnerManagement && operation != AppSettingMetadataOperation.Write)
+            throw new UnauthorizedAccessException("Unknown metadata operation.");
         var target = targetCompanyId ?? string.Empty;
         if (target.Length > 0 && (!Guid.TryParse(target, out var id) || id.ToString() != target))
             throw new UnauthorizedAccessException("Invalid settings metadata target.");
@@ -91,7 +95,7 @@ public sealed class AppSettingMetadataScopeExecutor(IAppSettingMetadataAuthorize
             throw new UnauthorizedAccessException("The settings target is outside the authorized tenant.");
         cancellationToken.ThrowIfCancellationRequested();
         var previous = Ambient.Value;
-        var capability = new Capability(grant.ActorId, grant.TenantId, target, companies, operation, (timeProvider ?? TimeProvider.System).GetUtcNow().AddSeconds(30), tenantContext, currentUser, timeProvider ?? TimeProvider.System);
+        var capability = new Capability(policyName, grant.ActorId, grant.TenantId, target, companies, operation, (timeProvider ?? TimeProvider.System).GetUtcNow().AddSeconds(30), tenantContext, currentUser, timeProvider ?? TimeProvider.System);
         Ambient.Value = capability;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
@@ -103,7 +107,7 @@ public sealed class AppSettingMetadataScopeExecutor(IAppSettingMetadataAuthorize
         AppSettingScope scope, bool isGlobal)
     {
         var c = Current;
-        if (c is null || c.Operation != AppSettingMetadataOperation.Write || isGlobal
+        if (c is null || c.PolicyName != AppSettingMetadataPolicy.Microsoft365OwnerManagement || c.Operation != AppSettingMetadataOperation.Write || isGlobal
             || tenantId != c.TenantId || companyId != c.WriteCompanyId
             || category != AppSettingMetadataPolicy.Category || !AppSettingMetadataPolicy.Keys.Contains(key, StringComparer.Ordinal))
             return false;
