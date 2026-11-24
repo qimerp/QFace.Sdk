@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "key": "auth.identity.account_linked",
+  "version": 1,
+  "owner": {
+    "domain": "identity",
+    "service": "QimErp.Platform"
+  },
+  "summary": "Workspace account updated",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "account_holder",
+      "recipient": {
+        "source": "platform",
+        "from": "userId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "userId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Workspace",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "ChangeDescription",
+      "type": "text",
+      "required": true,
+      "source": "producer",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Your approved workspace access was added to your account."
+    }
+  ]
+}

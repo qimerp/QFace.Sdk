@@ -116,17 +116,33 @@ public sealed class CountryCodeNormalizerTests
     [Fact(DisplayName = "Every registered country profile's code and name round-trip")]
     public void Registered_profiles_round_trip()
     {
-        var profiles = new ServiceCollection()
-            .AddLogging()
-            .AddCountrySetupProfiles()
-            .BuildServiceProvider()
-            .GetServices<ICountrySetupProfile>()
-            .ToList();
+        using var services = new ServiceCollection().AddLogging().AddCountrySetupProfiles().BuildServiceProvider();
+        var profiles = services.GetServices<ICountrySetupProfile>().ToList();
+        var resolver = services.GetRequiredService<ICountrySetupProfileResolver>();
+        foreach (var input in new string?[] { null, "", "XX", "+999", "US", "+1-CA" })
+        {
+            Action resolve = () => resolver.Resolve(input);
+            resolve.Should().Throw<InvalidOperationException>();
+        }
 
         profiles.Should().NotBeEmpty();
 
         foreach (var profile in profiles)
         {
+            if (profile.SupportsOperationalSetup)
+            {
+                resolver.Resolve(profile.CountryCode).Should().BeSameAs(profile);
+                resolver.Resolve(profile.CountryName).Should().BeSameAs(profile);
+                resolver.Resolve("+999-" + profile.CountryCode).Should().BeSameAs(profile);
+                profile.GetPayrollDefaults().Currency.Should().Be(profile.Currency);
+                profile.GetPayrollDefaults().CurrencySymbol.Should().Be(profile.CurrencySymbol);
+                if (profile.CountryCode != "GH") profile.GetPayrollDefaults().TaxAuthorityName.Should().NotContain("Ghana");
+            }
+            else
+            {
+                Action resolve = () => resolver.Resolve(profile.CountryCode);
+                resolve.Should().Throw<InvalidOperationException>();
+            }
             CountryCodeNormalizer.Normalize(profile.CountryCode)
                 .Should().Be(profile.CountryCode.ToUpperInvariant(),
                     "profile code '{0}' must normalize to itself", profile.CountryCode);

@@ -7,6 +7,7 @@ namespace QimErp.Shared.Common.TenantSetup.Profiles;
 /// </summary>
 public class GhanaCountryProfile : ICountrySetupProfile
 {
+    public virtual bool SupportsOperationalSetup => GetType() == typeof(GhanaCountryProfile);
     public virtual string CountryCode => "GH";
     public virtual string CountryName => "Ghana";
     public virtual string Currency => "GHS";
@@ -41,12 +42,12 @@ public class GhanaCountryProfile : ICountrySetupProfile
     ];
 
     public virtual PayrollSettingsDefaults GetPayrollDefaults() => new(
-        Currency:                "GHS",
-        CurrencySymbol:          "₵",
+        Currency:                Currency,
+        CurrencySymbol:          CurrencySymbol,
         DefaultWorkingDaysPerWeek: 5,
         DefaultWorkingHoursPerDay: 8,
         IsMonthly:               true,
-        TaxAuthorityName:        "Ghana Revenue Authority (GRA)");
+        TaxAuthorityName:        CountryCode == "GH" ? "Ghana Revenue Authority (GRA)" : $"{CountryName} tax authority");
 
     public virtual IReadOnlyList<LeaveTypeDefinition> GetLeaveTypes() =>
     [

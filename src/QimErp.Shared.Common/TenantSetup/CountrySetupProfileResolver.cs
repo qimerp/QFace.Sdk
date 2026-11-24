@@ -9,18 +9,13 @@ public sealed class CountrySetupProfileResolver(
 
     public ICountrySetupProfile Resolve(string? countryCode)
     {
-        var code = (countryCode ?? "GH").Trim().ToUpperInvariant();
-        if (_byCode.TryGetValue(code, out var profile))
+        var code = CountryCodeNormalizer.Normalize(countryCode);
+        if (code is not null && _byCode.TryGetValue(code, out var profile) && profile.SupportsOperationalSetup)
             return profile;
 
         logger.LogWarning(
-            "[CountrySetup] Country '{Code}' not yet fully supported — using Ghana statutory defaults. " +
-            "Verify SSNIT rates, PAYE brackets and public holidays are correct for this tenant.",
+            "[CountrySetup] Country '{Code}' has no supported setup profile; country setup is required.",
             code);
-
-        // Fall back to Ghana as the reference implementation
-        return _byCode.TryGetValue("GH", out var ghana)
-            ? ghana
-            : throw new InvalidOperationException("Ghana (GH) country profile must be registered.");
+        throw new InvalidOperationException("Country setup is required before this workspace can be initialized.");
     }
 }

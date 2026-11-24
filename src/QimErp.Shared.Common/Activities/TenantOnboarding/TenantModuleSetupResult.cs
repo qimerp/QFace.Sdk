@@ -2,6 +2,7 @@ namespace QimErp.Shared.Common.Activities.TenantOnboarding;
 
 public class TenantModuleSetupResult
 {
+    public FounderIdentityResult? FounderIdentity { get; set; }
     public bool Success { get; set; }
     public bool AlreadyExists { get; set; }
     public string? ErrorMessage { get; set; }
