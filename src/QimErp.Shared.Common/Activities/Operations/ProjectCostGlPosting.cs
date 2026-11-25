@@ -19,6 +19,7 @@ public static class ProjectCostGlPostingErrors
 {
     public const string PeriodClosed = "Gl.PeriodClosed";
     public const string AccountInvalid = "Gl.AccountInvalid";
+    public const string ExchangeRateMissing = "Gl.ExchangeRateMissing";
 }
 
 /// <summary>Operations → Finance GL: post one project cost (Dr <see cref="DebitAccountId"/> tagged with the project, Cr <see cref="CreditAccountId"/>).</summary>
@@ -26,7 +27,7 @@ public class ProjectCostGlPostingRequest
 {
     public string TenantId { get; set; } = string.Empty;
 
-    /// <summary>Top level so the activity interceptor scopes the consumer to this company; empty means tenant-wide.</summary>
+    /// <summary>Required; top level so the activity interceptor scopes the consumer to this company.</summary>
     public string CompanyId { get; set; } = string.Empty;
 
     public Guid ExpenditureId { get; set; }

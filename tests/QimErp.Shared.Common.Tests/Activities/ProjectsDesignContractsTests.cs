@@ -87,6 +87,7 @@ public sealed class ProjectsDesignContractsTests
         ActivityName(typeof(IProjectCostGlPostingActivity)).Should().Be("PostProjectCost:Gl");
         ProjectCostGlPostingErrors.PeriodClosed.Should().Be("Gl.PeriodClosed");
         ProjectCostGlPostingErrors.AccountInvalid.Should().Be("Gl.AccountInvalid");
+        ProjectCostGlPostingErrors.ExchangeRateMissing.Should().Be("Gl.ExchangeRateMissing");
 
         var request = new ProjectCostGlPostingRequest
         {
