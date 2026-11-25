@@ -64,7 +64,7 @@ public static class NotificationIntentLock
 
     public static byte[] ReadContract(string key, int version)
     {
-        if (version != 1 || key is not ("auth.identity.pending_invitation" or "auth.identity.existing_link_invitation" or "auth.identity.account_linked"))
+        if (version != 1 || key is not ("auth.account.activation_requested" or "auth.identity.pending_invitation" or "auth.identity.existing_link_invitation" or "auth.identity.account_linked"))
             throw new KeyNotFoundException("No canonical contract resource is available for this intent.");
         using var stream = typeof(NotificationIntentLock).Assembly.GetManifestResourceStream(
             "QimErp.Shared.Common.NotificationContracts." + key + ".v1.json")

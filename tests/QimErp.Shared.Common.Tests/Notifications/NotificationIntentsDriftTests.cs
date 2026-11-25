@@ -45,7 +45,7 @@ public class NotificationIntentsDriftTests
         var files = Directory.GetFiles(Path.Combine(NotificationFixtures.Root, "intents"), "*.json");
         files.Should().HaveCount(NotificationIntentLock.Contracts.Count);
 
-        foreach (var identity in new[] { "auth.identity.pending_invitation", "auth.identity.existing_link_invitation", "auth.identity.account_linked" })
+        foreach (var identity in new[] { "auth.account.activation_requested", "auth.identity.pending_invitation", "auth.identity.existing_link_invitation", "auth.identity.account_linked" })
         {
             var canonical = NotificationIntentLock.ReadContract(identity, 1);
             canonical.Should().Equal(File.ReadAllBytes(Path.Combine(NotificationFixtures.Root, "intents", identity + ".v1.json")));
