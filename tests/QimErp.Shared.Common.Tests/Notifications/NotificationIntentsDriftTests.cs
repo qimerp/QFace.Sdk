@@ -45,6 +45,16 @@ public class NotificationIntentsDriftTests
         var files = Directory.GetFiles(Path.Combine(NotificationFixtures.Root, "intents"), "*.json");
         files.Should().HaveCount(NotificationIntentLock.Contracts.Count);
 
+        foreach (var identity in new[] { "auth.account.activation_requested", "auth.identity.pending_invitation", "auth.identity.existing_link_invitation", "auth.identity.account_linked" })
+        {
+            var canonical = NotificationIntentLock.ReadContract(identity, 1);
+            canonical.Should().Equal(File.ReadAllBytes(Path.Combine(NotificationFixtures.Root, "intents", identity + ".v1.json")));
+            canonical[0] = 0;
+            NotificationIntentLock.ReadContract(identity, 1)[0].Should().Be((byte)'{');
+        }
+        Action unknown = () => NotificationIntentLock.ReadContract("auth.identity.unknown", 1);
+        unknown.Should().Throw<KeyNotFoundException>();
+
         foreach (var file in files)
         {
             var name = Path.GetFileNameWithoutExtension(file);
@@ -58,9 +68,9 @@ public class NotificationIntentsDriftTests
     }
 
     [Fact]
-    public void Lock_CarriesAll50Contracts_IncludingLegacySenderIntents()
+    public void Lock_CarriesAll54Contracts_IncludingIdentityInvitationsAndFinanceIntents()
     {
-        NotificationIntentLock.Contracts.Should().HaveCount(50);
+        NotificationIntentLock.Contracts.Should().HaveCount(54);
         NotificationIntentLock.Contracts.Keys.Should().Contain(
         [
             NotificationIntentLock.Identity(NotificationIntents.People.LeaveRequestSubmitted.Key, NotificationIntents.People.LeaveRequestSubmitted.V1),
@@ -93,6 +103,7 @@ public class NotificationIntentsDriftTests
             NotificationIntentLock.Identity(NotificationIntents.Support.TicketAssigned.Key, NotificationIntents.Support.TicketAssigned.V1),
             NotificationIntentLock.Identity(NotificationIntents.Support.TicketQueued.Key, NotificationIntents.Support.TicketQueued.V1),
             NotificationIntentLock.Identity(NotificationIntents.Support.TicketSlaBreached.Key, NotificationIntents.Support.TicketSlaBreached.V1),
+            NotificationIntentLock.Identity(NotificationIntents.Finance.WhtCertificateReady.Key, NotificationIntents.Finance.WhtCertificateReady.V1),
         ]);
     }
 

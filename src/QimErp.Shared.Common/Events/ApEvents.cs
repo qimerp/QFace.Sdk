@@ -14,6 +14,8 @@ public class ApBillPostedEvent : DomainEvent
     public string CurrencyCode { get; set; } = string.Empty;
     public decimal GrandTotal { get; set; }
     public List<ApBillPostedLineData> Lines { get; set; } = [];
+    public Guid? JournalEntryId { get; set; }
+    public string? JournalNumber { get; set; }
 
     public ApBillPostedEvent()
     {
@@ -77,6 +79,7 @@ public class ApBillPostedLineData
     public string? ProjectNumber { get; set; }
     public Guid? TaskId { get; set; }
     public string? TaskNumber { get; set; }
+    public Guid? ExpenseAccountId { get; set; }
 }
 
 /// <summary>

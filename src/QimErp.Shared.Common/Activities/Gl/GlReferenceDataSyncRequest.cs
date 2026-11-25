@@ -7,7 +7,8 @@ public enum GlReferenceEntityType
     ChartOfAccount,
     CostCenter,
     FiscalYear,
-    FiscalPeriod
+    FiscalPeriod,
+    TaxGroup
 }
 
 public enum GlReferenceSyncOperation
@@ -36,4 +37,5 @@ public class GlReferenceDataSyncRequest
     public CostCenterDeletedEvent? CostCenterDeleted { get; set; }
     public FiscalYearUpdatedEvent? FiscalYearUpdated { get; set; }
     public FiscalPeriodUpdatedEvent? FiscalPeriodUpdated { get; set; }
+    public TaxGroupUpdatedEvent? TaxGroupUpdated { get; set; }
 }

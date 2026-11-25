@@ -15,6 +15,15 @@ public class PurchaseOrderOnOrderData
     public DateTime OrderDate { get; set; }
     public long? WarehouseId { get; set; }
     public List<PurchaseOrderOnOrderLineData> Lines { get; set; } = [];
+
+    /// <summary>Payloads without an action are <see cref="PurchaseOrderOnOrderAction.Opened"/>.</summary>
+    public PurchaseOrderOnOrderAction Action { get; set; } = PurchaseOrderOnOrderAction.Opened;
+}
+
+public enum PurchaseOrderOnOrderAction
+{
+    Opened = 0,
+    Released = 1
 }
 
 public class PurchaseOrderOnOrderLineData
@@ -24,4 +33,6 @@ public class PurchaseOrderOnOrderLineData
     public string ProductName { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public Guid? PurchaseOrderLineId { get; set; }
+    /// <summary>Null when the sender did not sync a price; never read it as zero cost.</summary>
+    public decimal? UnitPrice { get; set; }
 }

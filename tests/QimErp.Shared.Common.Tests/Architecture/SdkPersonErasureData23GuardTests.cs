@@ -6,14 +6,15 @@ namespace QimErp.Shared.Common.Tests.Architecture;
 public class SdkPersonErasureData23GuardTests
 {
     [Fact]
-    public void ModuleSyncRegistry_PersonErasure_includes_CoreHr_CashManagement_Workflow_Leave_Payroll_and_IAM()
+    public void ModuleSyncRegistry_PersonErasure_includes_CoreHr_CoreAccounting_Workflow_Leave_Payroll_and_IAM()
     {
         var path = FindSourceFile("ModuleSyncRegistry.cs", "QimErp.Shared.Common");
         path.Should().NotBeNull();
         var content = File.ReadAllText(path!);
 
         content.Should().Contain("SyncType.PersonErasure, ModuleKeys.CoreHR");
-        content.Should().Contain("SyncType.PersonErasure, ModuleKeys.CashManagement");
+        content.Should().Contain(
+            "SyncType.PersonErasure, ModuleKeys.CoreAccounting, \"qimerp-finance-cash-management-employee-sync\", \"CashManagement\"");
         content.Should().Contain(
             "SyncType.PersonErasure, ModuleKeys.Workflow, \"qimerp-platform-workflow-actor-sync\", \"Workflow\"");
         content.Should().Contain(

@@ -6,6 +6,7 @@ namespace QimErp.Shared.Common.TenantSetup.Profiles;
 /// </summary>
 public sealed class NigeriaCountryProfile : GhanaCountryProfile
 {
+    public override bool SupportsOperationalSetup => true;
     public override string CountryCode => "NG";
     public override string CountryName => "Nigeria";
     public override string Currency => "NGN";
@@ -292,6 +293,7 @@ public sealed class NigeriaCountryProfile : GhanaCountryProfile
 /// </summary>
 public sealed class KenyaCountryProfile : GhanaCountryProfile
 {
+    public override bool SupportsOperationalSetup => true;
     public override string CountryCode => "KE";
     public override string CountryName => "Kenya";
     public override string Currency => "KES";
@@ -575,6 +577,7 @@ public sealed class KenyaCountryProfile : GhanaCountryProfile
 /// </summary>
 public sealed class TanzaniaCountryProfile : GhanaCountryProfile
 {
+    public override bool SupportsOperationalSetup => false;
     public override string CountryCode => "TZ";
     public override string CountryName => "Tanzania";
     public override string Currency => "TZS";

@@ -21,4 +21,6 @@ public enum SyncType
     Vendor,
     /// <summary>Person erasure fan-out → module PseudonymisePerson activities (DATA-23).</summary>
     PersonErasure,
+    /// <summary>Platform company profile → Accounting document header copy.</summary>
+    CompanyProfile,
 }

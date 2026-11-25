@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "key": "auth.identity.pending_invitation",
+  "version": 1,
+  "owner": {
+    "domain": "identity",
+    "service": "QimErp.Platform"
+  },
+  "summary": "Workspace invitation",
+  "channels": [
+    "email"
+  ],
+  "audiences": [
+    {
+      "key": "pending_recipient",
+      "recipient": {
+        "source": "platform",
+        "from": "provisioningRequestId"
+      }
+    }
+  ],
+  "references": [
+    {
+      "name": "provisioningRequestId",
+      "type": "id",
+      "required": true,
+      "sensitivity": "Internal"
+    }
+  ],
+  "fields": [
+    {
+      "name": "FirstName",
+      "type": "text",
+      "required": false,
+      "source": "platform",
+      "sensitivity": "Pii",
+      "resolvedAt": "precheck",
+      "example": "Sample",
+      "resolvedFrom": "recipient.firstName"
+    },
+    {
+      "name": "TenantName",
+      "type": "text",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Internal",
+      "resolvedAt": "precheck",
+      "example": "Example Workspace",
+      "resolvedFrom": "tenant.name"
+    },
+    {
+      "name": "ActionUrl",
+      "type": "url",
+      "required": true,
+      "source": "platform",
+      "sensitivity": "Sensitive",
+      "resolvedAt": "afterPrecheck",
+      "example": "https://example.invalid/invitation",
+      "resolvedFrom": "identity.pending_invitation_url",
+      "url": {
+        "host": "platform-frontend",
+        "purpose": "pending_identity_invitation",
+        "reference": "provisioningRequestId",
+        "singleUse": true
+      }
+    }
+  ]
+}

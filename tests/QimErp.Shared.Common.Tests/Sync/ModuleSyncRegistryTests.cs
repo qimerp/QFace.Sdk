@@ -23,20 +23,58 @@ public class ModuleSyncRegistryTests
     }
 
     [Fact]
-    public void FilterByInstalled_Employee_IncludesCashManagementWhenSelected()
+    public void FilterByInstalled_Employee_IncludesFinanceWhenCoreAccountingSelected()
     {
+        var withAccounting = ModuleSyncRegistry.FilterByInstalled(
+            SyncType.Employee,
+            [ModuleKeys.CoreAccounting]);
+        withAccounting.Should().ContainSingle(s =>
+            s.ModuleKey == ModuleKeys.CoreAccounting
+            && s.TaskQueue == "qimerp-finance-cash-management-employee-sync"
+            && s.ActivitySuffix == "CashManagement");
+
         var withCash = ModuleSyncRegistry.FilterByInstalled(
             SyncType.Employee,
             [ModuleKeys.CoreAccounting, ModuleKeys.CashManagement]);
-        withCash.Should().Contain(s => s.ModuleKey == ModuleKeys.CashManagement);
-        withCash.Should().Contain(s =>
-            s.TaskQueue == "qimerp-finance-cash-management-employee-sync"
-            && s.ActivitySuffix == "CashManagement");
+        withCash.Should().ContainSingle(s => s.TaskQueue == "qimerp-finance-cash-management-employee-sync");
+        withCash.Should().NotContain(s => s.ModuleKey == ModuleKeys.CashManagement);
 
-        var withoutCash = ModuleSyncRegistry.FilterByInstalled(
+        var withoutAccounting = ModuleSyncRegistry.FilterByInstalled(
             SyncType.Employee,
-            [ModuleKeys.CoreAccounting]);
-        withoutCash.Should().NotContain(s => s.ModuleKey == ModuleKeys.CashManagement);
+            [ModuleKeys.CoreHR, ModuleKeys.Payroll]);
+        withoutAccounting.Should().NotContain(s => s.TaskQueue == "qimerp-finance-cash-management-employee-sync");
+    }
+
+    [Fact]
+    public void ResolveEmployeeBackfillStep_FinanceStepBelongsToCoreAccounting()
+    {
+        ModuleSyncRegistry.ResolveEmployeeBackfillStep("core-accounting")
+            .Should().Be("EnsureEmployeeInCashManagement");
+        ModuleSyncRegistry.ResolveEmployeeBackfillStep("cash-management").Should().BeNull();
+
+        var subscription = ModuleSyncRegistry.TryResolveEmployeeBackfillStep("EnsureEmployeeInCashManagement");
+        subscription.Should().NotBeNull();
+        subscription!.ModuleKey.Should().Be(ModuleKeys.CoreAccounting);
+        subscription.TaskQueue.Should().Be("qimerp-finance-cash-management-employee-sync");
+        ModuleSyncRegistry.ResolveSetupStepQueue("EnsureEmployeeInCashManagement")
+            .Should().Be("qimerp-finance-cash-management-employee-sync");
+    }
+
+    [Fact]
+    public void ResolveEmployeeBackfillStep_InventoryRoutesToOperationsEmployeeSync()
+    {
+        ModuleSyncRegistry.ResolveEmployeeBackfillStep("inventory").Should().Be("EnsureEmployeeInInventory");
+
+        var subscription = ModuleSyncRegistry.TryResolveEmployeeBackfillStep("EnsureEmployeeInInventory");
+        subscription.Should().NotBeNull();
+        subscription!.ModuleKey.Should().Be(ModuleKeys.Inventory);
+        subscription.TaskQueue.Should().Be("qimerp-operations-project-employee-sync");
+        ModuleSyncRegistry.ResolveSetupStepQueue("EnsureEmployeeInInventory")
+            .Should().Be("qimerp-operations-project-employee-sync");
+        EmployeeSyncV2Modules.UsesV2(subscription.ActivitySuffix).Should().BeTrue();
+
+        ModuleSyncRegistry.FilterByInstalled(SyncType.Employee, [ModuleKeys.CoreHR])
+            .Should().NotContain(s => s.ModuleKey == ModuleKeys.Inventory);
     }
 
     [Fact]
@@ -83,6 +121,22 @@ public class ModuleSyncRegistryTests
     }
 
     [Fact]
+    public void FilterByInstalled_Customer_ProjectRoutesToOperationsCustomerSync()
+    {
+        var withProject = ModuleSyncRegistry.FilterByInstalled(
+            SyncType.Customer,
+            [ModuleKeys.AccountsReceivable, ModuleKeys.Project]);
+        withProject.Should().ContainSingle(s => s.ModuleKey == ModuleKeys.Project);
+        withProject[0].TaskQueue.Should().Be("qimerp-inventory-customer-sync");
+        withProject[0].ActivitySuffix.Should().Be("Project");
+
+        var withBoth = ModuleSyncRegistry.FilterByInstalled(
+            SyncType.Customer,
+            [ModuleKeys.Inventory, ModuleKeys.Project]);
+        withBoth.Select(s => s.ActivitySuffix).Should().BeEquivalentTo(["Inventory", "Project"]);
+    }
+
+    [Fact]
     public void FilterByInstalled_Vendor_InventoryOnlyWhenSelected()
     {
         var withInventory = ModuleSyncRegistry.FilterByInstalled(
@@ -113,11 +167,12 @@ public class ModuleSyncRegistryTests
     }
 
     [Fact]
-    public void FilterByInstalled_PersonErasure_includes_CoreHr_CashManagement_Workflow_Leave_Payroll_and_IAM()
+    public void FilterByInstalled_PersonErasure_includes_CoreHr_CoreAccounting_Workflow_Leave_Payroll_and_IAM()
     {
         var runtime = ModuleSyncRegistry.GetRuntimeSubscribers(SyncType.PersonErasure);
         runtime.Should().Contain(s => s.ModuleKey == ModuleKeys.CoreHR);
-        runtime.Should().Contain(s => s.ModuleKey == ModuleKeys.CashManagement);
+        runtime.Should().Contain(s => s.ModuleKey == ModuleKeys.CoreAccounting);
+        runtime.Should().NotContain(s => s.ModuleKey == ModuleKeys.CashManagement);
         runtime.Should().Contain(s => s.ModuleKey == ModuleKeys.Workflow);
         runtime.Should().Contain(s => s.ModuleKey == ModuleKeys.Leave);
         runtime.Should().Contain(s => s.ModuleKey == ModuleKeys.Payroll);
@@ -127,7 +182,7 @@ public class ModuleSyncRegistryTests
             SyncType.PersonErasure,
             [
                 ModuleKeys.CoreHR,
-                ModuleKeys.CashManagement,
+                ModuleKeys.CoreAccounting,
                 ModuleKeys.Workflow,
                 ModuleKeys.Leave,
                 ModuleKeys.Payroll,
@@ -138,7 +193,7 @@ public class ModuleSyncRegistryTests
             && s.TaskQueue == ModuleSyncWorkflowQueues.PersonErasureParent
             && s.ActivitySuffix == "CoreHR");
         subscribers.Should().Contain(s =>
-            s.ModuleKey == ModuleKeys.CashManagement
+            s.ModuleKey == ModuleKeys.CoreAccounting
             && s.TaskQueue == "qimerp-finance-cash-management-employee-sync"
             && s.ActivitySuffix == "CashManagement");
         subscribers.Should().Contain(s =>
