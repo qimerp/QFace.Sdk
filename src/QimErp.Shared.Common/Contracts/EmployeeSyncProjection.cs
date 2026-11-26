@@ -9,6 +9,7 @@ public sealed class EmployeeSyncProjection
     public Guid EmployeeId { get; init; }
     public string TenantId { get; init; } = string.Empty;
     public string CompanyId { get; init; } = string.Empty;
+    public IReadOnlyList<string> AssignedCompanyIds { get; init; } = [];
     public bool IsVisibleAcrossCompanies { get; init; }
     public long Version { get; init; }
 
